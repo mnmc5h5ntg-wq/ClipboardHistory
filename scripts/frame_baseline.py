@@ -809,20 +809,39 @@ def main(argv=None) -> int:
     if bake["reason"] == "tie":
         print(u"FRAME_BASELINE_SCALE_TIE 基线=%s ⇒ 那份基线自己就是说不出倍率的（混批或并列烤的）"
               % (bake["dist"] or u"（无）"))
-    if bake["scale"] and current_scale and bake["scale"] != current_scale:
+    # R589 / 靶 A：下面这一组读的是**同一对量**（`bake["scale"]` 与 `current_scale`），四种组合必须各有名字。
+    #   旧写法是两条互不相干的 `if` ⇒「当轮说得出、基线说不出」与「两边都说得出且相等」这两格**一行都不印**，
+    #   而静默与"量了没问题"在输出里逐字相同（R588 ⓪·3 现读：runner 的门那一步 `FRAME_BASELINE_SCALE*` 行数=0，
+    #   而那一跑的 `FRAME_BASELINE_BAKE … 倍率=（不知道） … 原因=（无）` 说明基线这一边说不出）。
+    #   两个 unknown **各归各家**，不许并成一条：当轮自己说不出 ⇒ `SCALE_NOT_RUN`；对照的另一边（基线）说不出 ⇒
+    #   `SCALE_BASELINE_UNKNOWN`。这两种成因的修法相反（前者要重捕或改名册，后者要重烤基线 = BACKLOG 655/660 归用户），
+    #   并成一条就等于把"该由谁签"藏进门里。R587 靶 A 那条"只许一条不判出口"的口径在本轮台账里更正为
+    #   **「当轮这一边只许一条」**，不是"这一维全世界只许一条"。
+    if not current_scale:
+        # 这一支仍是"当轮倍率说不出"的**唯一**出口（R587 / 靶 A ①：并列不许另开第二条同类门路）。
+        print(u"FRAME_BASELINE_SCALE_NOT_RUN=%s（当轮分布=%s 基线倍率=%s）⇒ 这一维今天没读数，"
+              u"不许读成倍率相符，也不许读成倍率不合"
+              % (cur_info["reason"], scale_dist_text(cur_info) or u"（无）",
+                 bake["scale"] or u"（不知道）"))
+    elif not bake["scale"]:
+        print(u"FRAME_BASELINE_SCALE_BASELINE_UNKNOWN=no-baseline-scale 基线出处=%s 基线原因=%s 当轮=%s"
+              u"（当轮量到 %d 张 分布=%s）⇒ **对照缺边**：当轮这一边说得出、基线那一份说不出倍率 ⇒ 这一格既不是"
+              u"「倍率相符」也不是「倍率不合」，它是「没有可比的那一边」；只报数不拦路（放宽/收紧都不发生）"
+              % (u"有" if bake["commit"] else u"无", bake["reason"] or u"（无）",
+                 current_scale, current_scale_frames, scale_dist_text(cur_info)))
+    elif bake["scale"] != current_scale:
         # 只报数不拦路：R584 已经量到 runner 自印 1.00x 而工作基线是本机 2x 烤的那件事，
         # 这一格把它从"推理"变成基线文档自己说得出来的读数。放宽/收紧都不发生。
         print(u"FRAME_BASELINE_SCALE_MISMATCH 基线=%s 当轮=%s（当轮量到 %d 张 分布=%s）⇒ 只报数不拦路，"
               u"它是「变帧那一维是不是同一件事」的现场证人"
               % (bake["scale"], current_scale, current_scale_frames, scale_dist_text(cur_info)))
-    if not current_scale:
-        # 这一支是"当轮倍率说不出"的**唯一**出口（R587 / 靶 A ①：并列不许另开第二条不判门路）。
-        # 上一版它挂在 `elif bake["scale"] and …` 下面 ⇒ 基线自己也说不出倍率时（混批/并列烤的）
-        # 两个 unknown 撞在一起，反而一行读数都不印 —— 那是"谁都不知道"被读成"没什么要报的"。
-        print(u"FRAME_BASELINE_SCALE_NOT_RUN=%s（当轮分布=%s 基线倍率=%s）⇒ 这一维今天没读数，"
-              u"不许读成倍率相符，也不许读成倍率不合"
-              % (cur_info["reason"], scale_dist_text(cur_info) or u"（无）",
-                 bake["scale"] or u"（不知道）"))
+    else:
+        # 兜底分支：两边都说得出且相等。以前这一格也**什么都不印** ⇒ "相符"这件事从来没有过自己的读数行，
+        # 只能靠"没有 MISMATCH 行"反推 —— 那是把 absence 当 judgement。新守卫
+        # `tier_reporting_shape.py` 的 R3 要求的正是这一条 `else` 存在。
+        print(u"FRAME_BASELINE_SCALE_MATCH 基线=当轮=%s（当轮量到 %d 张 分布=%s）⇒ 兜底分支：这一格有人判，"
+              u"它是「倍率相符」而不是「没人说倍率的事」"
+              % (current_scale, current_scale_frames, scale_dist_text(cur_info)))
     for name in changed:
         print("  changed  %s" % name)
     for name in missing:

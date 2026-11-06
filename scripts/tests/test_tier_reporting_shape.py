@@ -28,8 +28,8 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO)
 
-from scripts.tier_reporting_shape import (is_tier_iter, list_py, main, scan_file,   # noqa: E402
-                                          tier_iter_names, verdict)
+from scripts.tier_reporting_shape import (branch_groups, is_tier_iter, list_py, main, scan_file,   # noqa: E402
+                                          tier_iter_names, verdict, verdict_branch)
 
 TIERS = tier_iter_names()
 SCRIPTS = os.path.join(REPO, "scripts")
@@ -144,6 +144,122 @@ class CliTests(unittest.TestCase):
         rc, out = run_main([u"--scripts", live, u"--scratch", scratch])
         self.assertEqual(0, rc, out)
         self.assertIn(u"一次性脚本里的循环=1", out)
+
+
+class BranchChainTests(unittest.TestCase):
+    """R589 / 靶 A②：R3 —— 读了同一对量、印同一个通道前缀的一串 `if` 必须有『其余情况』分支。
+
+    这一族与 R1（循环里的 return）同形：不穷尽 ⇒ 至少一种组合一行都不印，而静默与"量了没问题"
+    在输出里逐字相同。R588 ⓪·3 在 runner 的门那一步现读到 `FRAME_BASELINE_SCALE*` 行数=0 就是实例，
+    而上一版这把尺**只扫循环**，对 if 链是盲的 ⇒ 下面每一格都既是判据也是这把尺自己的正对照。
+    """
+
+    def _chains(self, src):
+        return branch_groups(ast.parse(src, filename="synthetic.py"), "synthetic.py")
+
+    def test_open_chain_reading_the_same_pair_is_red(self):
+        src = (u"def f(a, b):\n"
+               u"    if a and b and a != b:\n"
+               u'        print("DEMONOTE_MISMATCH x")\n'
+               u"    if not b:\n"
+               u'        print("DEMONOTE_NOT_RUN y")\n')
+        chains = self._chains(src)
+        self.assertEqual(1, len(chains), chains)
+        self.assertEqual(False, chains[0]["closed"])
+        reds = verdict_branch(chains)
+        self.assertEqual(1, len(reds), reds)
+        self.assertIn(u"一行都不印", reds[0])
+        self.assertIn(u"没有兜底", reds[0])
+
+    def test_the_same_chain_with_a_catch_all_is_green(self):
+        src = (u"def f(a, b):\n"
+               u"    if a and b and a != b:\n"
+               u'        print("DEMONOTE_MISMATCH x")\n'
+               u"    elif not b:\n"
+               u'        print("DEMONOTE_NOT_RUN y")\n'
+               u"    else:\n"
+               u'        print("DEMONOTE_MATCH z")\n')
+        chains = self._chains(src)
+        self.assertEqual(1, len(chains), chains)
+        self.assertEqual(True, chains[0]["closed"])
+        self.assertEqual([], verdict_branch(chains))
+
+    def test_branches_reading_different_quantities_are_not_a_candidate(self):
+        """各判各的量 ⇒ 不算"一组互斥分支"。这一格是负半：不许把挨着的两朵 if 都当对象，
+        否则全仓每一条 `if` 都要写兜底，规矩就从"防静默"变成"逼出废话"。"""
+        src = (u"def f(a, z):\n"
+               u"    if a:\n"
+               u'        print("DEMONOTE_ONE x")\n'
+               u"    if z:\n"
+               u'        print("DEMONOTE_TWO y")\n')
+        self.assertEqual([], self._chains(src))
+
+    def test_branches_that_print_no_channel_are_not_a_candidate(self):
+        src = (u"def f(a, b):\n"
+               u"    if a and b:\n"
+               u"        do_thing()\n"
+               u"    if not b:\n"
+               u"        other()\n")
+        self.assertEqual([], self._chains(src))
+
+    def test_a_shared_label_is_not_a_shared_quantity(self):
+        """两条分支都 `== "tie"` 只说明它们贴同一个标签，不是共读同一个量 ⇒ 不许当对象（否则候选数虚胖）。"""
+        src = (u"def f(a, b):\n"
+               u'    if a == "tie":\n'
+               u'        print("DEMONOTE_TIE a")\n'
+               u'    if b == "tie":\n'
+               u'        print("DEMONOTE_TIE b")\n')
+        self.assertEqual([], self._chains(src))
+
+    def test_real_repo_chains_are_present_and_all_closed(self):
+        """现读全仓：链必须**找得到**（找不到的 0 不是绿），且每一条都有兜底。"""
+        chains = []
+        for p in list_py(SCRIPTS):
+            if (os.sep + "tests" + os.sep) in p:
+                continue
+            chains.extend(branch_groups(ast.parse(io.open(p, encoding="utf-8").read(), filename=p),
+                                         os.path.relpath(p, REPO)))
+        self.assertTrue(chains, u"分支链=0 ⇒ 这把尺对 if 链是盲的，不许读成「全仓都穷尽」")
+        self.assertEqual([], verdict_branch(chains), u"本轮修掉的那两处又长回来了：%s" % chains)
+        files = sorted({c["file"] for c in chains})
+        self.assertIn(u"scripts/frame_baseline.py", files)
+        self.assertIn(u"scripts/real_screen_control_chroma.py", files)
+
+    def test_cli_names_zero_chains_as_a_dimension_that_was_not_judged(self):
+        """`分支链=0` 必须**具名**成"这一维不判"，不许混进那句 ok —— 两维都没对象才 rc=2（上面那格）。
+
+        拦下"看不见"的位置有两处，这里证的是输出形状那一处；另一处是消费端：
+        CI 的 `Release script tests` 里那行 `TIER_BRANCH_BLIND=1` 与本文件上面那格
+        `test_real_repo_chains_are_present_and_all_closed`。
+        """
+        d = tempfile.mkdtemp(prefix="r589-nocat-")
+        io.open(os.path.join(d, "good.py"), "w", encoding="utf-8").write(
+            u"def f(a, b):\n"
+            u"    for s in TI" + u"ERS:\n"
+            u"        print(s, 'not-run=0')\n")
+        rc, out = run_main([u"--scripts", d, u"--scratch", d])
+        self.assertEqual(0, rc, out)
+        self.assertIn(u"TIER_BRANCH_SCAN 分支链=0", out)
+        self.assertIn(u"TIER_BRANCH_NOT_JUDGED=", out)
+        self.assertIn(u"这一维不判", out)
+
+    def test_extra_dir_is_counted_as_a_positive_control(self):
+        """`--extra` 那一路是**盲不盲**的读数：合成违规必须被认出来并计数。"""
+        live = tempfile.mkdtemp(prefix="r589-live2-")
+        io.open(os.path.join(live, "good.py"), "w", encoding="utf-8").write(
+            u"TI" + u"ERS = ('light', 'dark')\n"
+            u"def f(a, b):\n"
+            u"    for s in TI" + u"ERS:\n"
+            u"        print(s, 'not-run=0')\n")
+        extra = tempfile.mkdtemp(prefix="r589-extra-")
+        io.open(os.path.join(extra, "bad.py"), "w", encoding="utf-8").write(
+            u"def f(a, b):\n"
+            u"    if a and b:\n"
+            u'        print("DEMONOTE_MISMATCH x")\n'
+            u"    if not b:\n"
+            u'        print("DEMONOTE_NOT_RUN y")\n')
+        rc, out = run_main([u"--scripts", live, u"--scratch", live, u"--extra", extra])
+        self.assertIn(u"TIER_BRANCH_CONTROL 正对照链=1 其中应红=1 其中判成红=1", out)
 
 
 def run_main(argv):

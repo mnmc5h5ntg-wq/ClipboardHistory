@@ -296,7 +296,7 @@ TABLES = [
             "mutate_r574",
             "mutate_r575",
             "mutate_r576", "mutate_r577", "mutate_r578", "mutate_r579", "mutate_r580", "mutate_r581",
-            "mutate_r582", "mutate_r583", "mutate_r584", "mutate_r585", "mutate_r586_frame", "mutate_r586_hover", "mutate_r587_frame", "mutate_r587_hover", "mutate_r587_heat", "mutate_r588_shape", "mutate_r588_stage"]
+            "mutate_r582", "mutate_r583", "mutate_r584", "mutate_r585", "mutate_r586_frame", "mutate_r586_hover", "mutate_r587_frame", "mutate_r587_hover", "mutate_r587_heat", "mutate_r588_shape", "mutate_r588_stage", "mutate_r589_scale", "mutate_r589_pair"]
 # R355 / BACKLOG 430：这一格以前只认 **三位** 刀号（`M\d{3}`），而仓库从 R345 起已经在用四位
 # （M1001…）：`arm_sites` 认不出 id ⇒ 整张表被读成「静态抽不出 needle」⇒ 那几把刀**从来没被针预检查过**
 # （R355 自己那把 M1005 就是这么发现隐形的；同一次把 r348 的旧针重钉了）。四位只许往后长，不再加第二位边界。

@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "note": "R589 / 638② 的证人形状：帧基线里**逐字节互为副本**的那些帧，每一组都要在这里有名有姓。这张表不删帧、不改名单、不替 638①（并进 vs 名册）选任何东西 —— 它只把「这组为什么同图」与「这组该不该同图」写成机器读得动的两格。来历=U-2440 那趟逐字节撞号扫描（356 帧 → 唯一哈希 346 → 8 组）。",
+  "observed_at": "R589 现读（本机 356 张帧的 sha256 分组）",
+  "rows": [
+    {
+      "members": ["content-paused-idle-750x560-dark.png", "content-with-history-750x560-dark.png"],
+      "should_be_identical": "是",
+      "cause": "R417 的负臂就是「未暂停」：`pausedForCapture=false` 与产品默认的 `nil → @AppStorage(\"recordingPaused\")=false` 读进同一条 `isPausedForDrawing`，两棵树一字不差",
+      "cause_refs": ["U-2440", "R417", "UICaptureHarness.swift:14210-14215", "UICaptureHarness.swift:12679", "ContentView.swift:89", "ContentView.swift:18"],
+      "ticket": "638",
+      "observed": {"sha": "3373e4631a8f", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "两臂各自由 `testPauseBannerAppearsOnlyWhenCaptureIsPaused`（`content-paused-idle` ↔ `content-paused`）拿去作证 —— 它们互相比是设计内同图，不与彼此比"
+    },
+    {
+      "members": ["content-paused-idle-750x560-light.png", "content-with-history-750x560-light.png"],
+      "should_be_identical": "是",
+      "cause": "同上一组的亮档副本（同一个成因、同一个色档另一份）",
+      "cause_refs": ["U-2440", "R417", "UICaptureHarness.swift:14210-14215", "ContentView.swift:89"],
+      "ticket": "638",
+      "observed": {"sha": "8d8434f889ae", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "同上"
+    },
+    {
+      "members": ["detail-3-files-720x520-dark.png", "detail-3-files-row0-720x520-dark.png"],
+      "should_be_identical": "是",
+      "cause": "夹具循环那一条与 R252 那颗按行取证键那一条**体是同一两行**（都 `makePopulatedStore(selectingIndex: 3)` + `DetailView`）⇒ index 3 选到的就是默认展示那一条",
+      "cause_refs": ["U-2440", "R252 / BACKLOG 296", "UICaptureHarness.swift:13346-13351", "UICaptureHarness.swift:13371-13376", "UICaptureHarness.swift:19062-19101"],
+      "ticket": "638",
+      "observed": {"sha": "fc542e225a88", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "`detail-3-files` 只作为 `controlInkProbes` 的探针靶（UICaptureHarness.swift:19633）；`detail-3-files-row0` 的判据比的是它与自己 hover 的那一对（16756/16921），不是与 `detail-3-files` 互比"
+    },
+    {
+      "members": ["detail-3-files-720x520-light.png", "detail-3-files-row0-720x520-light.png"],
+      "should_be_identical": "是",
+      "cause": "同上一组的亮档副本",
+      "cause_refs": ["U-2440", "R252 / BACKLOG 296", "UICaptureHarness.swift:13346-13351", "UICaptureHarness.swift:13374-13376"],
+      "ticket": "638",
+      "observed": {"sha": "f42f3939f039", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "同上"
+    },
+    {
+      "members": ["quickpick-search-focus-420x300-dark.png", "quickpick-search-hover-420x300-dark.png"],
+      "should_be_identical": "是",
+      "cause": "R415 明文「与 hover 同一档视觉，取证键分开（只点亮焦点）」，而产品那一段两态走**同一条** fill+stroke（`guard (focusedForCapture ?? focused) || (hoveredForCapture ?? hovered)` 之后只画一次）⇒ 相同是设计",
+      "cause_refs": ["U-2440", "R415", "R409", "UICaptureHarness.swift:12969-12976", "QuickPickController.swift:1223-1225"],
+      "ticket": "638",
+      "observed": {"sha": "b38dfe662854", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "两条判据各自比的是「抬起 vs 静置」：`testQuickPickSearchFieldHoverLiftsItsChrome`（5461）与 `testQuickPickSearchFieldFocusLiftsItsChrome`（6072），各自对 `quickpick-list` ⇒ 不是恒真门"
+    },
+    {
+      "members": ["quickpick-search-focus-420x300-light.png", "quickpick-search-hover-420x300-light.png"],
+      "should_be_identical": "是",
+      "cause": "同上一组的亮档副本",
+      "cause_refs": ["U-2440", "R415", "UICaptureHarness.swift:12974-12976", "QuickPickController.swift:1223-1225"],
+      "ticket": "638",
+      "observed": {"sha": "e27c77479ac4", "members": 2, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "同上"
+    },
+    {
+      "members": ["row-favorite-off-300x74-dark.png", "row-pinned-off-300x74-dark.png", "row-text-300x74-dark.png"],
+      "should_be_identical": "是",
+      "cause": "三张都是「没有那颗标记」的负臂：`ClipboardEntry.updating(...)` 只改 `isFavorite` / `isPinned` 而 `id`/`content`/时间戳不动，行 0 本来两个标记都是 false ⇒ 同一颗 `HistoryRowButton(entry:)` 进同一个 `rowFrame`；`HistoryRowViews.swift` 只在标记为真时画星/钉",
+      "cause_refs": ["U-2440", "UICaptureHarness.swift:13303", "UICaptureHarness.swift:13322", "UICaptureHarness.swift:13045-13051", "ClipboardEntry.swift:53-71", "HistoryRowViews.swift:41", "HistoryRowViews.swift:46", "HistoryRowViews.swift:188"],
+      "ticket": "638",
+      "observed": {"sha": "15eb949c2cec", "members": 3, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "`row-favorite-off` 是 `testDragSourceRowDimsOnlyWhileDragging`（17859）的静置对照；`row-text` 是 2975/3024 两处负臂；**`row-pinned-off` 现读没有任何消费者**（只有声明）⇒ 这一格是 638 那句「不为任何断言单独作证」的唯一实例，R590 要么给它找判据、要么由用户在 638① 里选并进"
+    },
+    {
+      "members": ["row-favorite-off-300x74-light.png", "row-pinned-off-300x74-light.png", "row-text-300x74-light.png"],
+      "should_be_identical": "是",
+      "cause": "同上一组的亮档副本",
+      "cause_refs": ["U-2440", "UICaptureHarness.swift:13303", "UICaptureHarness.swift:13322", "UICaptureHarness.swift:13045-13051"],
+      "ticket": "638",
+      "observed": {"sha": "0be1c12229ec", "members": 3, "corpus_frames": 356},
+      "registered_by_round": "R589",
+      "machine": "local:MacBook-Air.local",
+      "consumer_note": "同上（含 `row-pinned-off` 无消费者那一格）"
+    }
+  ]
+}

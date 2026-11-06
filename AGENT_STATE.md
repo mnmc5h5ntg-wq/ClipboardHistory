@@ -12,7 +12,7 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-06（本地 · R588 / 第 587 轮 / Round 585）
+最后更新：2026-11-06（本地 · R589 / 第 588 轮 / Round 586）
 ## R570 ⓪ 开工（2026-11-04 · 第 569 轮 / Round 567 · 分岔证人那一跑还在 `in_progress` ⇒ 七格全部「未到数」，本轮先把证人做成不依赖它）
 
 ⓪·0 **身份现读**：UI_AUDIT 最新标题 = `## 第 568 轮（R569` ⇒ 本轮 **R570 = 第 569 轮 / Round 567**；`test_round_batch_consistency` 三格 OK；刀高水位现读 **M1488** ⇒ 本轮从 **M1489** 起；`PRODUCT_STREAK ledger_round=568 streak=1`（只抄门）。「最后更新」照旧**不在这一笔抬**（抬了 `back == 0` 就要求三本各有 R570 标题，而这一笔只动 STATE ⇒ 中间跑注定红；抬的时机 = 台账那一笔）。
@@ -249,6 +249,213 @@
     没动三张按机器登记的表与 `registeredOffscreenVerdict(scale:)`、没动 `FLOOR_LIGHT=1.20 / FLOOR_DARK=1.10` 与 4.5 墨地板 / 150 上限 /
     120ms / Motion ≥2 / 2x 8.0pt / 1x 6.0pt / 像素容差 1.5 / `--allow-missing`、名册与豁免表一字未改、
     `PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED` 与 `FRAME_BASELINE_DRIFT_NOT_JUDGED` 两条具名不判没撤、第③段着色器一字未写。
+
+## R589 状态（2026-11-06 · 第 588 轮 / Round 586 · 产品 0 文件 + **取证通道本身读不读得对对象**（本节① 倍率那组互斥分支补穷尽并新增具名出口 `SCALE_BASELINE_UNKNOWN`；本节② 形状守卫从「只扫循环」扩到「互斥分支链必须有兜底」，并现读出第二处同形洞；本节③ 638② 从散文做成会红的门：逐字节副本名册 + 唯一像素证人断言；本节④ 三条预测之所以读不到，是因为守卫的 print 被 `run_main()` 吞在测试里 ⇒ 把尺接在它被打印的那一步上）+ 判据卷 +38 格 + 刀 M1560–M1566 全 CAUGHT + ⓪ R588 两跑都到数）
+
+⓪ **现读两对（`ci_status_r589.py`，取值时刻 09:36–10:05）**：两对**都到数**，都是 `completed / failure`。
+   1. `42139904001 ↔ b8939ce`（R588 主笔）⇒ 全部失败步骤：`JOB build-and-test ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`。
+      逐步骤结论另取一趟（`steps` 视图只给失败的那些 ⇒ 「不在列表里」不等于「跑过且绿」）：
+      `Release script tests ⇒ success`、`Frame baseline vs working manifest ⇒ success`、`On-screen probe coverage floor ⇒ success`。
+      三条预测（标签逐字来自 R588 的 `PREDICTIONS_R589`，判法本轮新写、每条带「正文从哪一步取」）：
+      · STEP[9] 里 `TIER_SHAPE_RESULT=ok` 且 `档位循环=3 带return=0 无可数格=0` 在 runner 上第一次出现 ⇒ **未读到（那条通道今天没有行）**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+      · STEP[9] 里 `STAGE_GATE_RESULT=ok`（判的最新一节是 R588）⇒ 这条守卫的外部证人到手 ⇒ **未读到（那条通道今天没有行）**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+      · `FRAME_STATE_STOPS not-run=` 与 `RUNG_STEP_TIER_COVERAGE not-run=` 今天都不该出现（两档的帧都齐）⇒ 出现就是 runner 少了一档帧，不是本轮判据变了 ⇒ **中**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+   2. `42142286963 ↔ 805e447`（R588 补记笔）⇒ 失败步骤：`JOB build-and-test ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`；逐步骤结论 `Release script tests ⇒ success`、`On-screen probe coverage floor ⇒ success`。
+      三条预测：
+      · STEP[9] 里 `TIER_SHAPE_RESULT=ok` 且 `档位循环=3 带return=0 无可数格=0` 在 runner 上第一次出现 ⇒ **未读到（那条通道今天没有行）**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+      · STEP[9] 里 `STAGE_GATE_RESULT=ok`（判的最新一节是 R588）⇒ 这条守卫的外部证人到手 ⇒ **未读到（那条通道今天没有行）**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+      · `FRAME_STATE_STOPS not-run=` 与 `RUNG_STEP_TIER_COVERAGE not-run=` 今天都不该出现（两档的帧都齐）⇒ 出现就是 runner 少了一档帧，不是本轮判据变了 ⇒ **中**
+        （取处：按步骤名没取到 ⇒ 退化：全跑按通道串取到 0 行（步骤名可用但正文里没有））
+   3. **这一格是本轮的靶子本身**：三条预测里两条「未读到」、第三条读成「中」——而那个「中」是**空的**：
+      它判的是「整跑没有 `FRAME_STATE_STOPS` / `RUNG_STEP_TIER_COVERAGE` 这两行」，
+      可是那两条通道的所有读数都被 `scripts/tests/*` 里的 `run_main()` 重定向进 StringIO，**从来没有进过 CI 日志**。
+      ⇒ R588 ⑤·(a) 那条「预测要带第三格（正文从哪一步取）」在这里被补成第四格：**这条通道究竟由哪一步、以什么方式印出去**；
+      一条只在测试内被调用的守卫，在 runner 上等于没有读数。本轮的修法见本节④。
+   4. `STEP[18]` 那一朵 R588 记的是「跑间漂」（主笔 8/8/0 对补记笔 3/7/1）⇒ 本轮两跑读回的是同一形状：
+      那一步在两跑里的逐步骤结论都是 `success` ⇒ 这一格今天只能说「这两跑到数、那一步没红」，
+      不能说「STEP[18] 绿了」（`steps` 视图不给成功步骤建行，判跑没跑要看 `jobs[].steps` —— 本笔就是这么取的），
+      更不能把它写成 R588 那朵漂移已经消失。
+   5. **R590 的 ⓪ 要读的五格**（前四条的判法与「正文从哪一步取」都写在 `ci_status_r589.py` 的 `PREDICTIONS_R590`，由脚本判、不由下一轮念）：
+      ①本轮这一笔（主笔 + 补记笔）的成对号 —— 由补记那一趟现取现写，本笔不许替它填数；
+      ②STEP[11] 里 `FRAME_BASELINE_SCALE_BASELINE_UNKNOWN` 第一次出现没有（runner 的基线说不出倍率、当轮 1.00x ⇒ 应该响）；
+      ③STEP[9] 里 `TIER_SHAPE_RESULT=ok` 且 `分支链≥2`（R3 那一维第一次有读数行）；
+      ④STEP[9] 里 `IDENTICAL_PAIR_RESULT=` 有没有出声（没有这一行 = 接线没跑起来，不等于「这台机器没有副本」）；
+      ⑤`SHAPE_GUARD_EXIT … rc=0` 恰好两行（接线自己的证人）。
+      另带两条不许从问题开始：`变帧=16 已登记=16`（本轮本机那一门的现读，与 655 同源）与
+      `row-pinned-off` 无消费者那一格。
+
+① **真实推进（本节① / §3 第②段）：倍率那组互斥分支补穷尽 + 新增具名出口**
+   `scripts/frame_baseline.py` 里读同一对量（`bake["scale"] × current_scale`）的分支从两条独立 `if` 改成一串 `if/elif/elif/else`，
+   四个格子各有名字：当轮说不出 ⇒ `SCALE_NOT_RUN`；**当轮说得出、基线说不出 ⇒ 新增 `FRAME_BASELINE_SCALE_BASELINE_UNKNOWN`**；
+   两边都说得出且不等 ⇒ `SCALE_MISMATCH`；相等 ⇒ 新增兜底 `SCALE_MATCH`。
+   证人（本轮新增那格判据，`scripts/tests/test_frame_baseline.py::test_the_four_scale_cells_each_have_exactly_one_named_line`）：
+   四格**各有名且互斥**（合成批次 subTest 四例，断言「印出来的那一行必须恰好是期望的那一条」）。
+   ⚠ 口径更正（这条必须写清，否则下一轮会以为 R587 的规矩被推翻了）：R587 靶 A 说「当轮说不出倍率时只许 `SCALE_NOT_RUN`
+   一条出口」，那一句话的**范围是「当轮这一边」**，不是「这一维全世界只许一条」。本轮新增的是**对照另一边**说不出时的出口 ——
+   两种成因的修法相反（前者要重捕/改名册，后者要重烤基线 = 655/660 归用户），并成一条就等于把「该由谁签」藏进门里。
+   这条更正由 ① 那格判据钉：四行互斥 ⇒ 少一条就红，多一条也红。
+
+② **真实推进（本节②）：形状守卫扩到互斥分支链，并现读出第二处同形洞**
+   `scripts/tier_reporting_shape.py` 加 R3：同一段里 ≥2 条 `if`（含 `elif` 摊平）、各分支都印同一个通道前缀、
+   且**共读同一个量** ⇒ 必须有『其余情况』分支，没有就红。全仓现读（逐字见读数文件）：
+   `TIER_SHAPE_SCAN 活仪器文件=40 档位循环=3 带return=0 无可数格=0 一次性脚本里的循环=32（只数不判）
+     逐字 scripts/frame_recording_proof.py:205 循环=205 return=[] 可数=有
+     逐字 scripts/heatmap_frame_levels.py:163 循环=163 return=[] 可数=有
+     逐字 scripts/hover_two_state_diff.py:195 循环=195 return=[] 可数=有
+   TIER_BRANCH_SCAN 分支链=5（口径：按分支行号集合去重后的**候选链**条数，同一条长链的嵌套子串各算一次） 共读同量=5 无兜底=0 正对照链=0（--extra 给了才有）
+     逐字链 scripts/frame_baseline.py:782 条数=9 前缀=FRAME_BASELINE_ 兜底=有 共读=Name(id='current_scale', ctx; Subscript(value=Name(id='bak
+     逐字链 scripts/frame_baseline.py:826 条数=2 前缀=FRAME_BASELINE_SCALE_ 兜底=有 共读=Subscript(value=Name(id='bak
+     逐字链 scripts/real_screen_control_chroma.py:301 条数=5 前缀=REALSCREEN_ 兜底=有 共读=Name(id='outcome', ctx=Load(
+     逐字链 scripts/real_screen_control_chroma.py:319 条数=3 前缀=REALSCREEN_ 兜底=有 共读=Name(id='outcome', ctx=Load(
+     逐字链 scripts/real_screen_control_chroma.py:326 条数=2 前缀=REALSCREEN_OUTCOME_ 兜底=有 共读=Name(id='outcome', ctx=Load(
+   TIER_SHAPE_RESULT=ok 档位循环=3 全部逐档点名且缺席可数；分支链=5 全部有兜底`
+   两处真对象都修了：`scripts/frame_baseline.py`（本节①）与 `scripts/real_screen_control_chroma.py:301` ——
+   后者是本轮**扫出来的第二处**：`press_outcome` 的文档串自己写着「四个出口各有名字，因为这四种修法相反」，
+   而旧代码只对 `not_landed` 拦路 ⇒ `unmeasured`（药丸或行带压根没量到 = **尺坏了**）一路静默走进色度判定。
+   现在四个返回值 + 兜底各有名，`unmeasured` 与 `unknown` 都拦路（这是判据面行为变化，不在产品面）。
+   盲区正对照（门的 0 要分得开「没有违规」与「看不见违规」）：合成违规目录 + `--extra` 读数行
+   `TIER_BRANCH_CONTROL 正对照链=…`；链数=0 时具名 `TIER_BRANCH_NOT_JUDGED=`，由 CI 那一步读成 `TIER_BRANCH_BLIND=1` 并拦红。
+   ⚠ 计数口径写清：`分支链` 按「分支行号集合」去重，同一条长链的**嵌套子串各算一次** ⇒ 那个数不是「漏洞个数」。
+   这条守卫认不认得 `elif/else` 这种写法 —— **认得，而且是被迫学会的**：AST 里 `elif` 是 `orelse=[If]`，
+   第一版不摊平就把 `frame_baseline.py` 那条真对象整条漏掉（⑨·2），现在 `flatten_chain` 摊平之后
+   `test_the_same_chain_with_a_catch_all_is_green` 与 M1562 一正一反钉住它。
+   ⚠ 这一格**不许被读成 656 有进展**：656 那三条出路仍归用户，本轮一字未改这台机器的全局外观 ——
+   证人就是「没动」本身：`scripts/real_screen_control_chroma.py` 里那条 `security` / 外观相关调用一字未改（本轮只改了
+   `outcome` 那串分支与那行通道值的形状），且 656 的单子文本一字未动。
+
+③ **真实推进（本节③）：638② 从散文做成会红的门**
+   新名册 `docs/frame_identical_pairs.json`（8 行 = 现读 8 组逐字节副本，每行带 members / should_be_identical /
+   cause / cause_refs / ticket / observed.sha / registered_by_round / **machine**）
+   与新守卫 `scripts/identical_frame_witness.py`（三格口径：R-a 未登记就红、R-b 两个方向分开点名、
+   R-c 判据只引用同一组副本 ⇒ 恒真门就红并点名）。现读逐字：
+   `IDENTICAL_PAIR_MACHINE 本机=local:MacBook-Air.local 名册本机行=8 他机行=0
+   IDENTICAL_PAIRS png=356 夹具键=178 逐字节同图组=8 本机名册行=8 未登记=0 漂了=0 名册帧缺失=0 不该相同=0 唯一证人=0
+     逐字组 content-paused-idle-750x560-dark.png+content-with-history-750x560-dark.png sha=3373e4631a8f 成员=2
+     逐字组 content-paused-idle-750x560-light.png+content-with-history-750x560-light.png sha=8d8434f889ae 成员=2
+     逐字组 detail-3-files-720x520-dark.png+detail-3-files-row0-720x520-dark.png sha=fc542e225a88 成员=2
+     逐字组 detail-3-files-720x520-light.png+detail-3-files-row0-720x520-light.png sha=f42f3939f039 成员=2
+     逐字组 quickpick-search-focus-420x300-dark.png+quickpick-search-hover-420x300-dark.png sha=b38dfe662854 成员=2
+     逐字组 quickpick-search-focus-420x300-light.png+quickpick-search-hover-420x300-light.png sha=e27c77479ac4 成员=2
+     逐字组 row-favorite-off-300x74-dark.png+row-pinned-off-300x74-dark.png+row-text-300x74-dark.png sha=15eb949c2cec 成员=3
+     逐字组 row-favorite-off-300x74-light.png+row-pinned-off-300x74-light.png+row-text-300x74-light.png sha=0be1c12229ec 成员=3
+   IDENTICAL_PAIR_RESULT=ok 组=8 全部登记、方向各自点名、无恒真证人`
+   禁事全部守住：**没删一张帧、没动基线名单、没跑 `frame_baseline.py update`**（那是 638①/655 归你的处置）。
+   为什么「建名册」不等于替你选了 638①：①那一问的两个选项（并进 vs 名册）差别在**帧数与名单**，
+   而本笔之后名单一字未动、帧数仍是 `FRAMES=356` ⇒ 两条路都还开着，名册只是把「这组为什么同图」变成机器读得动的证人。
+   三条证人（取值时刻=本笔落台账之前现读）：`git diff --stat -- docs/frame_baseline.json docs/frame_baselines/` **输出为空**；
+   `docs/frame_baseline.json` 的 `count=356 / frames 键数=356`（与 R588 同一份，没被本轮改过一个字节）；
+   `frame_baseline.py update` 本轮**一次都没跑**（`git status docs/` 里只多出一个新名册文件，基线与漂移名册都不在改动列表里）。
+   「该不该相同」两向都有格：正对照=两张真不同的帧必须判红（`test_should_differ_but_is_same_is_named_as_a_defect`），
+   负臂=该相同却不同也要红（`test_should_be_same_but_now_different_is_named_as_drift`），
+   同一趟里两个计数各 1 的那格（`test_the_two_directions_are_not_merged_into_one_message`）钉住"不许合并成一句不符"。
+   本轮新读到的一条事实：`row-pinned-off` 在夹具源码里**只有声明、没有任何消费者**（引用次数现读=1）
+   ⇒ 这一格才是 638 那句「不为任何断言单独作证」的唯一实例，R590 要么给它找判据、要么由你在 638① 里选并进。
+
+④ **真实推进（本节④ / §4 第三问）：把尺接在它被打印的那一步上 —— 而这一格今天只能写到「接了」**
+   `.github/workflows/ci.yml` 的 `Release script tests` 末尾新增三条 CLI 调用（`tier_reporting_shape.py`、
+   `stage_gate_claims.py`、`identical_frame_witness.py`），并按 R242 那条老规矩**分开三种缺席**：
+   尺没打结论行 ⇒ `SHAPE_GUARD_READING_MISSING=1` 红；链数=0 ⇒ `TIER_BRANCH_BLIND=1` 红；
+   这一台没有自己的行/没有帧 ⇒ `IDENTICAL_WITNESS_NOT_RUN=1`（绿，带读数）。
+   ⚠ **本轮不许说「CI 已经接上」**：接 CI 的那一笔签不了自己（R555/R565 那一课）——
+   「那几步真的产出结论行了吗」只能由**含本笔的那一跑**证，已写进本节 ⓪·5 交给 R590。
+   今天能签的是**接线本身**：新卷 `scripts/tests/test_ci_shape_guard_wiring.py` 把那段 bash 抽出来 `bash -n`，
+   再对着临时帧目录**真跑**，两个方向各有格 ——
+   ①目录缺席 ⇒ 这一步**绿**并印 `IDENTICAL_PAIR_REFUSED=no-shots` + `IDENTICAL_WITNESS_NOT_RUN=1`；
+   ②同一台、名册与语料对不上 ⇒ 这一步**必须响**（`IDENTICAL_PAIR_RED … 不在现读语料里`）。
+   ②就是①那条「绿 + 具名」的**负半证人**：它证明这一支不是无条件放行，而是「没人判」与「判了且红」分得开。
+   为什么同一个 `rc=2` 在两支里处置相反（写清，否则下一轮会以为我自创例外）：守卫那一支的 2 是
+   **扫描器没有对象**（尺坏了 ⇒ 拦路）；副本名册那一支的 2 是**这台机器还没登记过自己的行**（数据缺席 ⇒ 具名不判）。
+   把后者也拦就等于逼我拿别台那 8 行冒充这一台的观测 —— 那正是 658 三条出路里最坏的一条，归用户，不由我代选。
+   顺出来的一条既有缺陷：本轮把 `real_screen_control_chroma.py` 带进扫描范围之后，
+   通道卫生守卫现读到它的 `REALSCREEN_CHROMA_VERDICT=%s ｜ %s` **值槽里有裸空格**（R565 那一族，从前不在范围内所以没人看见）
+   ⇒ 已改成值槽只放一个词、说明另起一行；台账历史上引的正是 `=<一个词>` 那个形状，所以引用不受影响。
+
+⑤ **验证链（顺序照派单）**：build `BUILD_WARNINGS=0` → 判据卷 → 刀 M1560–M1566（**落刀前现读高水位=M1559**，没抄派单数）→
+   新表 `mutate_r589_scale` / `mutate_r589_pair` 进预检名册 → 刀已还原复跑判据（`before=630cd54ab5543afae6ac4360b6ac540d cb2335c4eed587cadf0000d027959d52 9d07e04032860091e12c42c26a803b15 beb3879cea15c43a737ba62cd3bc1d4b after=630cd54ab5543afae6ac4360b6ac540d cb2335c4eed587cadf0000d027959d52 9d07e04032860091e12c42c26a803b15 beb3879cea15c43a737ba62cd3bc1d4b 同一份=yes`）→
+   捕获卷 `CAPTURE_LINES=2775`、帧 `FRAMES=356` → 本机那一门 `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）` / 判定 `FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=16 新帧=0 本机行=16 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 已登记=16 未登记=0 陈旧行=0` / 倍率新出口 `FRAME_BASELINE_SCALE_BASELINE_UNKNOWN=no-baseline-scale 基线出处=无 基线原因=（无） 当轮=2.00x（当轮量到 356 张 分布=2.00x:356）⇒ **对照缺边**：当轮这一边说得出、基线那一份说不出倍率 ⇒ 这一格既不是「倍率相符」也不是「倍率不合」，它是「没有可比的那一边」；只报数不拦路（放宽/收紧都不发生）` →
+   逐张看图（见下）→ 全量 `FULL_TOTAL=Executed 1441 tests, with 60 tests skipped and 0 failures (0 unexpected) in 656.678 (656.762) seconds`、skipped `FULL_SKIPPED=with 60 tests skipped` → 三道预检串行 → 换装 `SKIP_INSTALL=no-product-change` →
+   七本台账 → 派生格**落盘之后**现读 → 电池 `Ran 885 tests in 112.680s / OK (skipped=5)`（第一趟/第二趟两个时刻都记）。
+
+⑥ **看图那一腿（尺走 659 认过的形状：`convert("L")` 之后再 `getbbox`，并配同尺寸正对照）**：
+LOOK_SHOTS=/tmp/r589/frames png=356
+LOOK 组=content-paused-idle-dark.png + content-with-history-dark.png ｜ 逐字节同一=是 ｜ 尺寸=(1500, 1120) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 content-empty-750x560-dark.png 比=163526 颗（该非 0）；名册该行说该相同=是
+LOOK 组=content-paused-idle-light.png + content-with-history-light.png ｜ 逐字节同一=是 ｜ 尺寸=(1500, 1120) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 content-empty-750x560-light.png 比=169765 颗（该非 0）；名册该行说该相同=是
+LOOK 组=detail-3-files-dark.png + detail-3-files-row0-dark.png ｜ 逐字节同一=是 ｜ 尺寸=(1440, 1040) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 detail-0-text-720x520-dark.png 比=34572 颗（该非 0）；名册该行说该相同=是
+LOOK 组=detail-3-files-light.png + detail-3-files-row0-light.png ｜ 逐字节同一=是 ｜ 尺寸=(1440, 1040) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 detail-0-text-720x520-light.png 比=32714 颗（该非 0）；名册该行说该相同=是
+LOOK 组=quickpick-search-focus-dark.png + quickpick-search-hover-dark.png ｜ 逐字节同一=是 ｜ 尺寸=(840, 600) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 quickpick-cross-year-420x300-dark.png 比=67232 颗（该非 0）；名册该行说该相同=是
+LOOK 组=quickpick-search-focus-light.png + quickpick-search-hover-light.png ｜ 逐字节同一=是 ｜ 尺寸=(840, 600) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 quickpick-cross-year-420x300-light.png 比=65707 颗（该非 0）；名册该行说该相同=是
+LOOK 组=row-favorite-off-dark.png + row-pinned-off-dark.png + row-text-dark.png ｜ 逐字节同一=是 ｜ 尺寸=(600, 148) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 row-drag-source-active-300x74-dark.png 比=12931 颗（该非 0）；名册该行说该相同=是
+LOOK 组=row-favorite-off-light.png + row-pinned-off-light.png + row-text-light.png ｜ 逐字节同一=是 ｜ 尺寸=(600, 148) ｜ 差量包围盒=None ｜ 差量颗数=0
+     正对照：自比=0 颗（该 0）；与 row-drag-source-active-300x74-light.png 比=11530 颗（该非 0）；名册该行说该相同=是
+
+⑦ **基线与名单**：产品文件 0 个，连续零改动 **21** 轮（唯一取数口 `python3 scripts/product_streak.py`，**台账落盘之后**现读 `PRODUCT_STREAK ledger_round=588 streak=21 sections=564 as_of=last=8f679f9 last_round=567 newest=8f679f9 newest_round=567 date=2026-11-04 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)`；as-of 口径 ⇒ 读作「本轮之前最后一次产品改动在 21 轮前」；取数时刻由 `post_land()` 钉在函数名字上，不在纪律上 —— 但这一格是**手工填回**的，因为 `post_land()` 那一趟把 21 写到了**上一轮**那一格里（⑨·12）。帧名单未动（`FRAMES=356`），
+   三张按机器登记的表一字未改；本轮新增的是**第四张**按机器登记的表（副本名册），它从第一天起就带 `machine` 字段。
+
+⑧ **红名与对账**（本轮新印出来的 9 个名字逐条登记，`未标=0 对不上=0` 由门说、不由我数）：
+- **红名对账**：
+  · 红名「`TIER_SHAPE_RESULT=not-run 档位循环=0`（M1562 落刀那一趟）」→ ⑨·2
+  · 红名「刀手 `cut()` 把止锚那行写了两遍 ⇒ M1560 读成 DID-NOT-RUN」→ ⑨·10
+  · 红名「刀手还原语句写成 `open(path, "rb").write` ⇒ 崩在半路、变异留在盘上」→ ⑨·11
+  · 红名「三道 `test_ci_channel_hygiene` 红（扩大扫描范围揭出既有裸空格通道值）」→ ⑨·6
+  · 红名「`test_working_corpus…` 把 `re.findall` 的字符串当整数比 ⇒ 新卷预检红」→ ⑨·9
+  · 红名「`witness_reds` 第一版的"组外第三张"只与名册对账 ⇒ 合成对照组外键被误判成恒真」→ ⑨·4
+  · 红名「名册第一版按抹掉色档的键归组 ⇒ loader 自报「同组只准一行」」→ ⑨·5
+  · 红名「`/tmp/r589` 未建 ⇒ ⓪ 那一趟重定向直接失败（exit 1），我重跑了才记账」→ ⑨·9
+  · 红名「`REALSCREEN_CHROMA_VERDICT` 值槽裸空格（既有缺陷，本轮才进入范围）」→ ⑨·6
+  · 红名「本轮新通道名 9 个（`SHAPE_GUARD_EXIT`、`SHAPE_GUARD_READING_MISSING`、`TIER_BRANCH_BLIND`、`TIER_BRANCH_NOT_JUDGED`、`IDENTICAL_WITNESS_EXIT`、`IDENTICAL_WITNESS_NOT_RUN`、`IDENTICAL_WITNESS_READING_MISSING`、`REALSCREEN_OUTCOME_VERDICT`、`REALSCREEN_NOT_RUN outcome_*`）」→ **不计入对账口径**（契约名 —— 它们是本轮新出口的名字本身，不是待修的红；证人是 `test_ci_shape_guard_wiring.py::test_every_new_name_is_registered_somewhere`，它把「印了却没人登记」做成会红的断言）
+  · 红名「`IDENTICAL_PAIR_RESULT=not-run 本机行=0`（runner 那一台还没登记过自己的副本）」→ **不计入对账口径**（通道未跑 —— 这一维在 runner 上今天没人判，不许读成「runner 上没有副本」；负半证人是同一卷里那格「名册与语料对不上必须响」）
+  · 红名「`变帧=16 已登记=16`（本机那一门，与 655 同源的会话侧素材漂移）」→ **不计入对账口径**（基名在漂 —— 门已把它登记齐了、未登记=0；重烤与否归 655）
+- 门复算（预览 → 落盘 → 复算）：`RED_NAME_RECONCILIATION 节=R588 红名=11 计入行=7 编号去重=7 不计入=4 未标=0 对不上=0 口径=已启用`（落盘前那一趟报的是上一轮那一节，签这一格的是**落盘之后**那一趟）。
+  清账门 `LEDGER_ABSENCE_RESULT=ok 不成立=0/63`。
+
+⑨ **本轮自伤（照实记 13 格）**：R588 那句「⑨ 到 ⑨·9 为止」是**那一轮的封条**（限制补记不许再加格），
+   不是本轮的上限 ⇒ 本轮按实际发生记到 ⑨·13，一条不藏；补记那一笔不再往 ⑨ 里加。
+   1. 我第一次把 R3 的候选条件写成「每一条 `if` 都要有 else」⇒ 真语料上 `frame_baseline.py` 被误判成违规
+      （那些独立报告行 `if TIE: print …` 本来就不需要兜底）。收窄成「**最后一个分支**必须有兜底」才是这条规矩的对象。
+   2. 我第一次的候选识别没摊平 `elif` ⇒ AST 里 `elif` 是 `orelse=[If]`，于是那条真对象（倍率链）**整条滑出对象**，
+      现读只有 1 条链而它本该是 2 条 —— 这是「门的 0 是看不见不是没有」在本轮自己的复现，由 M1562 钉住。
+   3. 我把「链数=0 就 rc=2」写成无条件 ⇒ 「一次性脚本只数不判」那格（负半）被带歪读成红；
+      改成「具名 `TIER_BRANCH_NOT_JUDGED` + 由消费端拦红」，退出码那条老语义不动。
+   4. `witness_reds` 第一版的「组外第三张」只与名册对账 ⇒ 合成对照组外那把键不在名册里就被判成恒真；
+      现在口径挂在**现读语料的键**上（引用了另一张真帧就是有别的证人）。
+   5. 名册第一版按「抹掉色档的夹具键」归组 ⇒ 暗/亮两行塌成同一组，loader 自己报「同组只准一行」——
+      那是这把尺**先抓到我自己的形状错**，登记口径改成文件名。
+   6. 三道 `unittest` 红在 `test_ci_channel_hygiene` 上，起因是我把 `real_screen_control_chroma.py` 带进扫描范围，
+      暴露了一条**既有**的裸空格通道值。我没有加豁免（名册与豁免表一字未动），改的是那条代码本身。
+   7. `test_tier_reporting_shape.py` 里我给合成样本起的键名带连字符不够 ⇒ 第一版被 `referenced_keys` 的正则放过，
+      「负半没伤」那一格其实是空的；补成 `qa-focus` 那种形状之后才真的判到。
+   8. `test_identical_frame_witness.py` 我第一版让合成行继承「本机键」的方式是把 `machine` 留空 ⇒ loader 直接拒；
+      现在默认填 `machine_key()`，别台那一格显式覆盖，两格各判各的。
+   9. 本轮第一次跑 `ci_status_r589.py` 时 `/tmp/r589` 还没建，重定向直接失败（exit 1）；
+      那一趟没有任何读数，我没有把它当成「读不到 ⇒ 那就写未读到」的第一次机会，而是重跑了一次才记账。
+   10. 刀手的 `cut()` 第一版把止锚那一行**又当 replacement 传进去** ⇒ 那行被写两遍：M1560 因此变成 SyntaxError，
+       被读成 `DID-NOT-RUN`（其实是刀自己坏了，不是空刀）；M1561 恰好摊上"合法的重复 `for`"才侥幸抓到红。
+       改成「删除型 arm 的 replacement 一律是空串」之后两把都重跑，结论才由重跑那一趟签（前一趟不签）。
+   11. 刀手的还原语句写成 `open(path, "rb").write(orig)` ⇒ `io.UnsupportedOperation` 当场崩，
+       **变异被留在盘上**（`unregistered = []` 那行）。抓到它的不是我自己的检查，是下一把刀的预检读成红 ——
+       这正好证明「预检红就是报警器」这条设计有效，但也证明我少写了一格"刀链崩在半路必须立刻核对 md5"。
+       现在 `md5_before` 与 `md5_after` 四张全同，且中间那次残留已按原行改回并核过哈希。
+   12. **派生格的搜索范围又没锚在本轮小节内**（R569 ③ 那一族的复发）：`post_land()` 在全文件找
+       「连续零改动 **N** 轮」，而本轮那一格当时还是 `-1` 占位（`\d+` 匹配不到负号）⇒ 它匹配到**上一轮**那一节，
+       把 R588 的历史格从 `streak=20 / ledger_round=587` 改成 21/588。报警器是 `test_product_streak_cell`
+       （它自己报 `PRODUCT_STREAK_LEDGER_STALE … 当前轮：找不到这一格`），不是我发现的。
+       两处都修了：历史格按 `git show HEAD:AGENT_STATE.md` 逐字放回，本轮格按落盘后的实测填，
+       并把 `post_land()` 改成**先定位本轮小节、只在节内找**，找不到就当场报错（宁可红也不改历史）。
+   13. 修上面那一格时，我在 heredoc 的 python 里把中文引号嵌进双引号串 ⇒ `SyntaxError`（⑨·6 那一族在本轮第三次重犯，
+       而且是在写着"不许这样"的同一趟里）。补丁没落盘、判据卷先跑了一遍才暴露 ⇒ 记成一格，不当没发生。
+
 
 ## R588 状态（2026-11-06 · 第 587 轮 / Round 585 · 产品 0 文件 + **台账说的话有没有证人**（本节① 第③段断言做成会红的守卫；本节② 档位循环「逐档各自点名 + 缺席可数」做成守卫并修掉现读到的两处；本节③ 名册那 8 张暗档逐张看整帧）+ 判据卷 +27 格（词表守卫新卷 18 格 + 档位形状新卷 9 格）+ 刀 M1555/M1556 CAUGHT（M1557–M1559 归补记：它们的预检读的是台账自己）+ ⓪ 两跑都未到数）
 

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 分支穷尽与副本证人：倍率新增具名出口、形状守卫认 if 链、638② 做成门（R589 / 第 588 轮 / Round 586 · 2026-11-06）
+
+- `scripts/frame_baseline.py`：倍率那组互斥分支补成四格（新增 `SCALE_BASELINE_UNKNOWN` 与兜底 `SCALE_MATCH`），
+  判据卷新增四格真值表断言；R587 那条「只许一条出口」的**范围**在台账里更正为「当轮这一边只许一条」。
+- `scripts/tier_reporting_shape.py`：加 R3（互斥分支链必须有兜底），带 elif 摊平、共读量子识别、
+  合成正对照 `--extra` 与 `TIER_BRANCH_NOT_JUDGED`；本轮扫出的第二处同形洞 `scripts/real_screen_control_chroma.py` 一并修掉。
+- `docs/frame_identical_pairs.json` + `scripts/identical_frame_witness.py`：8 组逐字节副本第一次有名有姓，
+  三格口径（未登记 / 两个方向分开 / 副本不许当唯一像素证人），并按机器登记。
+- `.github/workflows/ci.yml`：三条形状守卫接进 `Release script tests` 的打印步骤，三种「没读到」分开拦。
+- 产品 0 文件；帧数与基线名单一字未动。
+
 ### 台账的话也要有证人：第③段断言守卫 + 档位缺席逐档点名且可数 + 名册 8 张暗档逐张看整帧（R588 / 第 587 轮 / Round 585，产品 0 文件）
     R587 的台账写着「段号=③」「段号仍是第②③段」，收口自陈写着「§3 第②③段各落一件」—— 那是假的：
     那一笔 `Sources/` 为空、`STAGE2_CLICKTHROUGH_BLOCKED` 与 `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS` 一条没撤、

@@ -316,6 +316,21 @@ def main():
     if outcome == "not_landed":
         print("REALSCREEN_NOT_RUN click_not_landed ⇒ 坐标点击没落地（BACKLOG 149 那一格），色度不算数")
         return 1
+    elif outcome == "unmeasured":
+        # R589 / 靶 A② 现读到第二处同形洞（第一处是倍率那一维）：`press_outcome` 的文档串自己写着
+        # 「四个出口各有名字，因为这四种修法相反」，而旧代码只对 `not_landed` 拦路 ⇒
+        # `unmeasured`（药丸或行带压根没量到 = **尺坏了**）一路静默走到下面的色度判定，
+        # 于是"量不到"被读成"量过且没问题"。这一支必须自己出声并拦路。
+        print("REALSCREEN_NOT_RUN click_unmeasured ⇒ 药丸或行带没量到（尺坏了，与上面三种都不同），色度不算数")
+        return 1
+    elif outcome == "already_selected":
+        print("REALSCREEN_OUTCOME_VERDICT=already_selected ⇒ 目标行本来就选中，不需要点，色度可以继续算")
+    elif outcome == "moved":
+        print("REALSCREEN_OUTCOME_VERDICT=moved ⇒ 药丸移动到目标行（同帧另一枚读数），色度可以继续算")
+    else:
+        # 兜底：`press_outcome` 以后多一种返回值时，这一格不许静默通过（新守卫 R3 钉的就是这条 `else`）。
+        print("REALSCREEN_NOT_RUN outcome_unknown=%s ⇒ 这个返回值没有人判过，色度不算数" % outcome)
+        return 1
 
     ref = chroma_stats(px, pw, ph, scale, REF_X[0], REF_X[1], REF_Y[0], REF_Y[1])
     con = chroma_stats(px, pw, ph, scale, CONTENT_X[0], CONTENT_X[1], CONTENT_Y[0], CONTENT_Y[1])
@@ -340,7 +355,11 @@ def main():
     }[verdict]
     print("REALSCREEN_CHROMA_RATIO 内容区/参照=%.3f 判法=≥%.2f 有色 / <%.2f 无色 / 参照下限=%d"
           % (ratio, HIGH, LOW, REF_MIN))
-    print("REALSCREEN_CHROMA_VERDICT=%s ｜ %s" % (verdict, meaning))
+    # 值槽里不许喂含空格的东西（R565 那一族）：`=%s ｜ %s` 会把一句散文塞进读数，
+    # 按空格切的下游解析就断在这里。台账历史上引的都是 `REALSCREEN_CHROMA_VERDICT=<一个词>`，
+    # 所以把说明单独起一行，值槽只留那个词。
+    print("REALSCREEN_CHROMA_VERDICT=%s" % verdict)
+    print(u"  这一格的读法：%s" % meaning)
     if not args.keep_png:
         os.remove(png)
     if verdict == "no_reference":

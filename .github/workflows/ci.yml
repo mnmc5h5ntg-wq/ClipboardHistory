@@ -429,6 +429,39 @@ jobs:
             [ "$hd" -eq 0 ] || exit 1
           fi
 
+          # R589 / §4 第三问（**取证通道本身读不读得对对象**）：三条形状守卫在 runner 上从来没有读数行。
+          # 根因是现读的，不是猜的 —— `scripts/tests/test_tier_reporting_shape.py:149` 那一类 `run_main()`
+          # 把 stdout 重定向进 StringIO：判据在测试里跑了、也判对了，但它印的通道串一行都没进 CI 日志。
+          # 于是 R588 交给本轮的三条预测读成两条「未读到」+ 一条**空洞的**「中」（第三条判的是"没有这行"，
+          # 而那一整跑本来就不会有这行 ⇒ 把 absence 当成了 judgement，正是 R588 ⑤·(a) 同一族的第二种坏法）。
+          # 修法走 R242 那条老规矩：**把尺接在它被打印的那一步上** —— 在这里直接跑 CLI，读数就归 runner。
+          for GUARD in scripts/tier_reporting_shape.py scripts/stage_gate_claims.py; do
+            "$PY" "$GUARD" 2>&1 | tee /tmp/guard_$(basename "$GUARD" .py).log
+            g=${PIPESTATUS[0]}
+            echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g（0=判过 / 1=红 / 2=扫描器没有对象，不许当绿）"
+            grep -E '^(TIER_SHAPE_|STAGE_GATE_)RESULT=' "/tmp/guard_$(basename "$GUARD" .py).log" \
+              || { echo "SHAPE_GUARD_READING_MISSING=1 $GUARD 没打结论行 ⇒ 这一格按未读到处理"; exit 1; }
+            # 「这一维没有对象」不许混在 ok 那一行里滑过去：链数=0 就是这把尺对 if 链是盲的，当场拦。
+            # 用 `if … then` 而不是 `grep && { … }` —— 这一步跑在 `bash -e` 下，
+            # 一个失败的 `A && B` 列表会让整步在**没有红**的情况下自己退出（那是假绿的反面：假红）。
+            if grep -q 'TIER_BRANCH_NOT_JUDGED=' "/tmp/guard_$(basename "$GUARD" .py).log"; then
+              echo "TIER_BRANCH_BLIND=1 分支链这一维没有对象 ⇒ 不许读成「全仓的互斥分支都穷尽了」"
+              exit 1
+            fi
+            [ "$g" -eq 0 ] || exit 1
+          done
+          # 副本名册这条要帧目录 ⇒ 三种"没读到"分开说，不许都算绿，也不许都算红：
+          #   没有 png / 本机还没有自己的登记行 ⇒ 具名 NOT_RUN（绿，带读数）；真有红 ⇒ 红；尺崩了没打结论行 ⇒ 红。
+          "$PY" scripts/identical_frame_witness.py --shots /tmp/shots-ci 2>&1 | tee /tmp/identical.log
+          id_rc=${PIPESTATUS[0]}
+          echo "IDENTICAL_WITNESS_EXIT=$id_rc（0=本机全部登记 / 1=有红 / 2=这台机器没对象或没自己的行）"
+          grep -E '^IDENTICAL_(PAIRS|PAIR_MACHINE|PAIR_RESULT|PAIR_REFUSED|PAIR_RED)' /tmp/identical.log \
+            || { echo "IDENTICAL_WITNESS_READING_MISSING=1 尺没打结论行"; exit 1; }
+          if [ "$id_rc" -eq 1 ]; then exit 1; fi
+          if [ "$id_rc" -eq 2 ]; then
+            echo "IDENTICAL_WITNESS_NOT_RUN=1 638② 的 runner 半还欠着：这一台既没有自己的行、也没法判 ⇒ 不许读成「runner 上没有副本」"
+          fi
+
       # 打包链路不产出可分发物，但必须能跑通：上一轮的缺陷正是"每一步都 || true"，
       # 于是缺键的 Info.plist 也算构建成功。这里跑脚本级校验，避免整包 universal 构建拖慢 CI。
       - name: Info.plist gate

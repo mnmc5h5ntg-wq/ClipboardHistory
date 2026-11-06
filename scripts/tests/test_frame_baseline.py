@@ -1282,6 +1282,58 @@ class ScaleDistributionTests(unittest.TestCase):
             self.assertNotIn(u"倍率=2.00x", out, out[-600:])
             self.assertIn(u"原因=tie", out, out[-600:])
 
+    FOUR_SCALE_CELLS = (u"FRAME_BASELINE_SCALE_BASELINE_UNKNOWN", u"FRAME_BASELINE_SCALE_MATCH",
+                        u"FRAME_BASELINE_SCALE_MISMATCH", u"FRAME_BASELINE_SCALE_NOT_RUN")
+
+    def _run_check(self, frames, root, baseline_scale, baseline_reason):
+        """烤一份基线、把它的 `capture_scale` 改成要测的那一边、再跑 `check` ⇒ 返回印出来的正文。"""
+        saved = os.environ.get("MOTION_FLOOR_MACHINE_KEY")
+        os.environ["MOTION_FLOOR_MACHINE_KEY"] = self.KEY
+        try:
+            rc, out = run_main([u"update", frames, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            path = os.path.join(root, "docs", "frame_baselines", "by_machine",
+                                "local_scale_fixture.json")
+            doc = json.load(io.open(path, encoding="utf-8"))
+            doc["capture_scale"] = baseline_scale
+            doc["capture_scale_reason"] = baseline_reason
+            io.open(path, "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False))
+            rc, out = run_main([u"check", frames, u"--against", u"working", u"--repo-root", root])
+            return out
+        finally:
+            os.environ.pop("MOTION_FLOOR_MACHINE_KEY", None)
+            if saved is not None:
+                os.environ["MOTION_FLOOR_MACHINE_KEY"] = saved
+
+    def test_the_four_scale_cells_each_have_exactly_one_named_line(self):
+        """R589 / 靶 A ①：`bake["scale"] × current_scale` 这四格**每格都要有自己的读数行**，而且互斥。
+
+        旧写法是两条互不相干的 `if` ⇒「当轮说得出、基线说不出」与「两边都说得出且相等」两格一行都不印，
+        于是"静默"与"量了没问题"在输出里逐字相同 —— R588 ⓪·3 在 runner 的门那一步现读到
+        `FRAME_BASELINE_SCALE*` 行数=0 而同一行里 `FRAME_BASELINE_BAKE … 倍率=（不知道）`，就是这一格。
+        这一格判的是**穷尽性**（四格各有名），不是四行内容的对错，所以它同时钉住：
+        少一条分支 ⇒ 那格没人出声 ⇒ 红；把兜底 `else` 摘掉 ⇒ 相等那格又变静默 ⇒ 红。
+        """
+        cases = [
+            (u"当轮说得出、基线说不出（旧文档 / 混烤）",
+             [(10, 10, 2.0)], u"", u"", u"FRAME_BASELINE_SCALE_BASELINE_UNKNOWN"),
+            (u"两边都说得出且相等 ⇒ 兜底分支",
+             [(10, 10, 2.0)], u"2.00x", u"ok", u"FRAME_BASELINE_SCALE_MATCH"),
+            (u"两边都说得出且不等",
+             [(10, 10, 1.0)], u"2.00x", u"ok", u"FRAME_BASELINE_SCALE_MISMATCH"),
+            (u"当轮说不出（并列批次），基线说得出",
+             [(10, 10, 2.0), (30, 30, 1.0)], u"2.00x", u"ok", u"FRAME_BASELINE_SCALE_NOT_RUN"),
+        ]
+        for title, spec, base_scale, base_reason, expect in cases:
+            with self.subTest(title=title):
+                with tempfile.TemporaryDirectory() as root:
+                    frames = self.dir_with(root, spec)
+                    out = self._run_check(frames, root, base_scale, base_reason)
+                    fired = [c for c in self.FOUR_SCALE_CELLS if c in out]
+                    self.assertEqual([expect], fired,
+                                     u"这一格应该且只应该印一条：%s；实际 %s\n正文尾部：%s"
+                                     % (expect, fired, out[-900:]))
+
     def test_channel_roster_matches_what_is_actually_printed(self):
         """通道名册要**双向**对账（R579 那一族：名册要靠被引用才红，单向只红一半）。
 
@@ -1314,6 +1366,7 @@ class ScaleDistributionTests(unittest.TestCase):
         u"FRAME_BASELINE_MISSING", u"FRAME_BASELINE_ADDED", u"FRAME_BASELINE_BAKE",
         u"FRAME_BASELINE_BAKE_PROVENANCE", u"FRAME_BASELINE_SAME_BAKE",
         u"FRAME_BASELINE_SCALE_MISMATCH", u"FRAME_BASELINE_SCALE_NOT_RUN",
+        u"FRAME_BASELINE_SCALE_BASELINE_UNKNOWN", u"FRAME_BASELINE_SCALE_MATCH",
         u"FRAME_BASELINE_SCALE_TIE", u"FRAME_BASELINE_SCALE_BAD",
         u"FRAME_BASELINE_SCALE_SIZELESS",
         u"FRAME_BASELINE_DRIFT", u"FRAME_BASELINE_DRIFT_NOT_JUDGED",
