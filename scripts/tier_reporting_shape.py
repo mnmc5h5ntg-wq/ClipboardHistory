@@ -191,33 +191,67 @@ def branch_groups(tree, relpath):
 
 
 def flatten_chain(node):
-    """把 `if / elif / elif / else` 摊成一条链：返回 (分支节点列表, 有没有兜底 else)。
+    """把 `if / elif / elif / else` 摊成一条链：返回 (分支节点列表, 兜底那一支的语句列表或 None)。
 
     为什么必须摊：`elif` 在 AST 里是 `orelse=[If(...)]`，不摊就只看得见链的第一朵 if，
     于是 `frame_baseline.py` 那条 `if … elif … elif … else` 会被读成「没有共读量子」而整条滑出对象
-    —— 本轮第一版就是这么把唯一那个真对象漏掉的（现读 `分支链=1`，而它本该是 2）。
+    —— 上一轮第一版就是这么把唯一那个真对象漏掉的（现读 `分支链=1`，而它本该是 2）。
+    返回的是**兜底体**而不是"有没有 else"的布尔：R590 靶 2 要的正是"兜底那一支出不出声"。
     """
     branches = [node]
     cur = node
     while cur.orelse and len(cur.orelse) == 1 and isinstance(cur.orelse[0], ast.If):
         cur = cur.orelse[0]
         branches.append(cur)
-    closed = bool(cur.orelse)
-    return branches, closed
+    catch = cur.orelse if cur.orelse else None      # None ⇒ 这条链根本没有『其余情况』那一支
+    return branches, catch
+
+
+def body_speaks(catch, prefix):
+    """兜底那一支有没有**出声**：印一条同前缀的通道串，或者退非 0 / 抛。
+
+    上一版的判据只问「有没有 `else`」⇒ 一个 `else: pass` 就能把"静默与量了没问题逐字相同"这个洞
+    重新开回去，而守卫仍然绿。出声的两种形状都算，默默过不算。
+    """
+    if catch is None:
+        return False, u"没有兜底"
+    if not catch:
+        return False, u"空体"
+    printed = exits = False
+    for st in catch:
+        for n in ast.walk(st):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "print":
+                for lit in ast.walk(n):
+                    if isinstance(lit, ast.Constant) and isinstance(lit.value, str) \
+                            and lit.value.startswith(prefix):
+                        printed = True
+            elif isinstance(n, ast.Raise):
+                exits = True
+            elif isinstance(n, ast.Return) and n.value is not None:
+                if isinstance(n.value, ast.Constant) and isinstance(n.value.value, int) and n.value.value != 0:
+                    exits = True
+                elif ast.dump(n.value).startswith(u"Call(func=Attribute(attr='exit'"):
+                    exits = True
+    if printed:
+        return True, u"print 同前缀"
+    if exits:
+        return True, u"退非 0/抛"
+    return False, u"不出声（既不印同前缀的通道串，也不退非 0）"
 
 
 def _judge_run(run, relpath):
     """一串连续的 if（含各自的 elif/else）⇒ 一条候选链。
 
-    `closed` 取**最后一朵**的兜底：静默恰好发生在"后面没人接"，而中间某朵独立报告（`if TIE: print …`）
-    本来就不需要 else —— 要求每一朵都有兜底会把无关的报告行也算成违规，规矩就从"防静默"退化成"逼废话"。
+    两条口径写死在这里，否则下一轮会误伤：
+    · 兜底只看**链尾**：静默恰好发生在"后面没人接"，而中间某朵独立报告（`if TIE: print …`）本来就不需要 else；
+    · 对象只收「兄弟分支都印同一个通道前缀」的链 ⇒ 纯逻辑分支上的**合法空 else** 不当对象（负对照那一格钉住）。
     """
     branches = []
-    closed = False
+    catch = None
     for it in run:
-        bs, has_else = flatten_chain(it)
+        bs, c = flatten_chain(it)
         branches.extend(bs)
-        closed = has_else
+        catch = c
     if len(branches) < 2:
         return []
     names = [printed_channel_literals(it.body) for it in branches]
@@ -234,9 +268,11 @@ def _judge_run(run, relpath):
     shared = set(k for k, v in cnt.items() if v >= 2 and not k.startswith(u"CONST:"))
     if not shared:
         return []                     # 各判各的量 ⇒ 不是一组互斥分支（不许把无关的 if 挨在一起就当对象）
+    has_catch = catch is not None
+    speaks, how = body_speaks(catch, prefix)
     return [{"file": relpath, "start": run[0].lineno, "lines": [it.lineno for it in branches],
-             "prefix": prefix, "shared": sorted(shared), "closed": closed,
-             "n": len(branches)}]
+             "prefix": prefix, "shared": sorted(shared), "closed": has_catch,
+             "speaks": speaks, "how": how, "n": len(branches)}]
 
 
 def list_py(root):
@@ -263,14 +299,25 @@ def verdict(rows):
 
 
 def verdict_branch(chains):
-    """R3：读了同一对量、印同一个通道前缀、却没有『其余情况』分支 ⇒ 红。"""
+    """R3：读了同一对量、印同一个通道前缀的一串分支，**链尾必须有人接，且接住那一支要出声**。
+
+    两种坏法分开点名（修法不同）：
+    · 没有兜底 ⇒ 至少一种组合一行都不印；
+    · 有 `else` 但它既不印同前缀的通道串也不退非 0 ⇒ 洞被一个空 `else` 重新开回去，而"有没有 else"这种判据读不出来。
+    """
     reds = []
     for c in chains:
+        if c["speaks"]:
+            continue
         if not c["closed"]:
             reds.append(u"%s:%d 连续 %d 条 if 都在印 `%s*` 且共读同一个量（%s），却没有兜底 `else` ⇒ "
                         u"至少一种组合一行都不印，而静默与「量了没问题」逐字相同"
                         % (c["file"], c["start"], c["n"], c["prefix"],
                            u"; ".join(x[:40] for x in c["shared"][:3])))
+        else:
+            reds.append(u"%s:%d 这条链有 `else` 但兜底那一支**不出声**（%s）⇒ 空 else 把「其余情况」写成了"
+                        u"「什么都不说」，与没有兜底逐字等价，而上一版判据只看有没有 `else` 所以读不出它"
+                        % (c["file"], c["start"], c["how"]))
     return reds
 
 
@@ -330,12 +377,14 @@ def main(argv=None):
         print(u"  逐字 %s:%d 循环=%d return=%s 可数=%s"
               % (r["file"], r["loop"], r["loop"], r["returns"], u"有" if r["countable"] else u"无"))
     unclosed = sum(1 for c in chains if not c["closed"])
+    silent = sum(1 for c in chains if c["closed"] and not c["speaks"])
     print(u"TIER_BRANCH_SCAN 分支链=%d（口径：按分支行号集合去重后的**候选链**条数，同一条长链的嵌套子串各算一次）"
-          u" 共读同量=%d 无兜底=%d 正对照链=%d（--extra 给了才有）"
-          % (len(chains), len(chains), unclosed, len(extra_chains)))
+          u" 共读同量=%d 无兜底=%d 有兜底却不出声=%d 正对照链=%d（--extra 给了才有）"
+          % (len(chains), len(chains), unclosed, silent, len(extra_chains)))
     for c in chains:
-        print(u"  逐字链 %s:%d 条数=%d 前缀=%s 兜底=%s 共读=%s"
+        print(u"  逐字链 %s:%d 条数=%d 前缀=%s 兜底=%s 出声=%s(%s) 共读=%s"
               % (c["file"], c["start"], c["n"], c["prefix"], u"有" if c["closed"] else u"无",
+                 u"有" if c["speaks"] else u"无", c["how"],
                  u"; ".join(x[:28] for x in c["shared"][:2])))
     reds = verdict(rows) + verdict_branch(chains)
     for r in reds:
@@ -345,7 +394,7 @@ def main(argv=None):
               % (len(extra_chains), sum(1 for c in extra_chains if not c["closed"]),
                  len(verdict_branch(extra_chains))))
     if reds:
-        print(u"TIER_SHAPE_RESULT=red 拦路=%d（其中分支链 %d）" % (len(reds), unclosed))
+        print(u"TIER_SHAPE_RESULT=red 拦路=%d（其中分支链：无兜底 %d / 空兜底不出声 %d）" % (len(reds), unclosed, silent))
         return 1
     if not rows:
         # 一个档位循环都没找到 ⇒ 扫描器读错了对象（词表改名了？循环写法换了？），这一格不许当绿
@@ -360,7 +409,7 @@ def main(argv=None):
         print(u"TIER_BRANCH_NOT_JUDGED=分支链这一维没有对象 ⇒ 这一维今天不判，不许读成「全仓的互斥分支都穷尽了」")
     print(u"TIER_SHAPE_RESULT=ok 档位循环=%d 全部逐档点名且缺席可数；分支链=%d %s"
           % (len(rows), len(chains),
-             u"全部有兜底" if chains else u"这一维不判（见上面那行 NOT_JUDGED）"))
+             u"全部有兜底且出声" if chains else u"这一维不判（见上面那行 NOT_JUDGED）"))
     return 0
 
 

@@ -11638,3 +11638,37 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 · **661**：Swift 捕获侧那 11 处一字未动（只登记）。
 · **646 / 647 / 654**：状态照旧 —— 两条具名阻塞（`STAGE2_CLICKTHROUGH_BLOCKED`、
   `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS`）一条不撤 ⇒ §3 第③段继续不开工。
+
+## R590 追账（2026-11-06 · 第 589 轮 / Round 587）
+
+**新开单 1 张**：
+
+**662. 具名 skip 的名册里没有「帧目录有没有内容」这一维**
+· 现象（取值时刻=本轮电池第二趟，`CLIPBOARD_HISTORY_UI_SHOTS=/tmp/r590/frames` 356 张）：
+  `test_the_roster_matches_what_this_machine_actually_skips` 报
+  `名册说这一台会跳而实际没跳：['test_ci_exit_matches_this_machines_registered_profile',
+  'test_every_real_pair_clears_the_floor_or_is_named_nonflat',
+  'test_the_real_shots_pair_at_least_as_well_as_the_registered_floor',
+  'test_working_frames_still_satisfy_the_three_relations']`。
+· 同一卷不设该变量 ⇒ `Ran 896 tests / OK (skipped=5)` ⇒ 两趟都真，分歧只在环境里有没有那批帧。
+· 与本轮 ⓪ 那三条 runner 红同族：名册按**机器**分档，而这几格的 skip 与否由**帧目录**决定 ⇒
+  档位少一维。CI 的 `Release script tests` 恰好设了 `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci`，
+  所以那一跑落哪一档取决于名册对 `github-runner` 写了什么。
+· 出路（归用户，一条不代选）：⑴给名册加第二维（帧目录有/无）；⑵把那几格改成"有帧就判、无帧就具名不判"，
+  不再走 skip 通道；⑶维持现状 + 电池固定不设帧目录（本轮临时采用，代价是 runner 与本机档位仍可能不同）。
+· 本轮**没有**动 `SKIP_ROSTER`（名册与豁免表一字不动是红线），也没有把出口降级成"不判"。
+
+**既有单子只补事实，不替用户选出路**：
+
+· **638**：②那一问的 runner 半本轮有了**外部证人**（`42159254212` 里 `IDENTICAL_PAIR_RESULT=` 印出来了，
+  且 `本机行=0 他机行=8` ⇒ 那一台落"具名不判"）。三条出路（并进 / 名册 / 让 runner 自己登记）仍一条没选；
+  `row-pinned-off` 无消费者那一格本轮一字未动。
+· **655 / 660**：倍率那一维四个出口各有名字（R589）；本轮新增的是**基线出处**那一条仍无 runner 读数
+  （`STEP[11]` 在主跑里 skipped）⇒ 重烤基线仍归用户。
+· **658**：机器维度这一族本轮**复发在本机自己的判据上**（把"另一台"写死成 `github-runner`）⇒ 已改成现读取反，
+  并留一格当场 `assertNotEqual`；三条出路仍没选。
+· **659**：本轮看图沿用它认过的形状（先 `convert("L")` 再 `getbbox` + 同尺寸正对照 + 自己 vs 自己必须 0），
+  并把它用在"两批帧对拍"这一种新对象上 ⇒ 没有新形状要补。
+· **661**：Swift 捕获侧那 11 处一字未动；本轮只是**读**了 Swift 树（扫描面 159 文件 / 2108 函数），没有改它。
+· **646 / 647 / 654**：状态照旧 —— `STAGE2_CLICKTHROUGH_BLOCKED`、
+  `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS=awaiting-654-direction` 两条具名阻塞一字未撤 ⇒ §3 第③段继续不开工。

@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 兜底要出声、扫描面要报数、runner 打回的三条错位各配一把刀（R590 / 第 589 轮 / Round 587 · 2026-11-06）
+
+- `scripts/tier_reporting_shape.py`：R3 的 `closed` 从「有没有 `else`」改判为「兜底那一支出不出声」
+  （印同前缀的结论行 / 退非 0 / 抛 之一，二者皆无即红）；新增读数 `有兜底却不出声=`，并配合法空 `else` 的负对照格。
+- `scripts/identical_frame_witness.py`：扫描面当**读数**印出来（`WITNESS_SCAN_SCOPE`，python+Swift 两侧、
+  字面量/拼接/插值三种形状），Swift 缺席与只数不判各有具名出口（`WITNESS_SWIFT_NOT_RUN` / `WITNESS_SWIFT_PARTIAL`）；
+  剥注释先块后行。
+- `.github/workflows/ci.yml`：`SHAPE_GUARD_EXIT` / `IDENTICAL_WITNESS_EXIT` 两行的**值槽与说明分开**
+  （runner 日志里那两处非 ASCII 粘连把 `rc` 打死，本轮字节级取证）；新格 `test_no_channel_value_slot_is_glued_to_a_parenthetical_explanation`。
+- `scripts/tests/test_ci_shape_guard_wiring.py`：负半证人改为自带名册（`machine` 现读），不再依赖"这台恰好登记过"；
+- `scripts/tests/test_identical_frame_witness.py`：真语料那格补第四个出口（有 png 但这台没有自己的行 ⇒ 具名 not-run），
+  "另一台"由现读派生；
+- `scripts/frame_baseline.py` 一字未动（产品 0 文件；本轮只**读**它的输出）；帧名单、四张按机器登记的表、
+  名册与豁免表一字未动，`update` 一次没跑。
+
 ### 分支穷尽与副本证人：倍率新增具名出口、形状守卫认 if 链、638② 做成门（R589 / 第 588 轮 / Round 586 · 2026-11-06）
 
 - `scripts/frame_baseline.py`：倍率那组互斥分支补成四格（新增 `SCALE_BASELINE_UNKNOWN` 与兜底 `SCALE_MATCH`），

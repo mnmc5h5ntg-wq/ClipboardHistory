@@ -212,7 +212,7 @@ class BranchChainTests(unittest.TestCase):
         self.assertEqual([], self._chains(src))
 
     def test_real_repo_chains_are_present_and_all_closed(self):
-        """现读全仓：链必须**找得到**（找不到的 0 不是绿），且每一条都有兜底。"""
+        """现读全仓：链必须**找得到**（找不到的 0 不是绿），且每一条的兜底都出得了声。"""
         chains = []
         for p in list_py(SCRIPTS):
             if (os.sep + "tests" + os.sep) in p:
@@ -224,6 +224,56 @@ class BranchChainTests(unittest.TestCase):
         files = sorted({c["file"] for c in chains})
         self.assertIn(u"scripts/frame_baseline.py", files)
         self.assertIn(u"scripts/real_screen_control_chroma.py", files)
+
+    # ——— 以下三格是 R590 / 靶 2：判据从"有没有 else"改成"兜底出不出声" ———
+
+    def test_an_empty_else_catch_all_is_red_and_named_as_silent(self):
+        """R590 靶 2 的正身：`else: pass` 有兜底但**不出声** ⇒ 必须红，并且报的是"不出声"而不是"没有 else"。
+
+        上一版只问 `closed` ⇒ 这个洞可以用一个空 else 原样开回去而守卫全绿。
+        今天 `frame_baseline.py` 那条兜底确实印 `SCALE_MATCH`，所以这一格钉的是**下一个会坏的位置**。
+        """
+        src = (u"def f(a, b):\n"
+               u"    if a and b and a != b:\n"
+               u'        print("DEMONOTE_MISMATCH x")\n'
+               u"    elif not b:\n"
+               u'        print("DEMONOTE_NOT_RUN y")\n'
+               u"    else:\n"
+               u"        pass\n")
+        chains = self._chains(src)
+        self.assertEqual(1, len(chains), chains)
+        self.assertEqual(True, chains[0][u"closed"])       # 有 else
+        self.assertEqual(False, chains[0][u"speaks"])      # 但不出声
+        reds = verdict_branch(chains)
+        self.assertEqual(1, len(reds), reds)
+        self.assertIn(u"不出声", reds[0])
+        self.assertIn(u"空 else", reds[0])
+
+    def test_a_catch_all_that_returns_nonzero_counts_as_speaking(self):
+        """出声有**两种**形状：印同前缀的通道串，或退非 0 / 抛。只承认 print 会把合法的拦路读成违规。"""
+        src = (u"def f(a, b):\n"
+               u"    if a and b:\n"
+               u'        print("DEMONOTE_BOTH x")\n'
+               u"    elif not b:\n"
+               u'        print("DEMONOTE_NOT_RUN y")\n'
+               u"    else:\n"
+               u"        return 1\n")
+        chains = self._chains(src)
+        self.assertEqual(1, len(chains), chains)
+        self.assertEqual(u"退非 0/抛", chains[0][u"how"])
+        self.assertEqual([], verdict_branch(chains))
+
+    def test_a_legit_empty_else_outside_a_reporting_chain_is_not_a_candidate(self):
+        """负对照：纯逻辑分支上的空 `else` **不该**红 —— 对象只收"兄弟分支都印同一个前缀"的链。
+
+        少了这一格，规矩会从"防静默"变成"逼每个 else 都写一句废话"，那种误伤下一轮一定被人绕过。
+        """
+        src = (u"def f(a, b):\n"
+               u"    if a:\n"
+               u"        do_one()\n"
+               u"    else:\n"
+               u"        pass\n")
+        self.assertEqual([], self._chains(src))
 
     def test_cli_names_zero_chains_as_a_dimension_that_was_not_judged(self):
         """`分支链=0` 必须**具名**成"这一维不判"，不许混进那句 ok —— 两维都没对象才 rc=2（上面那格）。

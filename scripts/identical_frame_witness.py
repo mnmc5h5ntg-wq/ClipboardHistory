@@ -35,6 +35,7 @@ if REPO not in sys.path:
 from scripts.frame_baseline import machine_key          # noqa: E402  （键的实现全仓只此一份，见 test_python_machine_key_implementations_agree）
 SCRIPTS = os.path.join(REPO, "scripts")
 ROSTER = os.path.join(REPO, "docs", "frame_identical_pairs.json")
+SWIFT_TESTS = os.path.join(REPO, "ClipboardHistory", "Tests")
 REQUIRED = (u"members", u"should_be_identical", u"cause", u"cause_refs", u"ticket",
             u"observed", u"registered_by_round", u"machine")
 SHA_PREFIX = 12
@@ -174,11 +175,65 @@ def referenced_keys(path):
     return out
 
 
-def witness_reds(rows, scripts_dir, self_path, corpus_keys=()):
+def strip_swift_comments(src):
+    """剥 Swift 注释：**先块后行**，顺序不许换。
+
+    R578 那一课的复发预防：先剥行注释时，块注释里那一句 `//` 会让正则从那里一路吃到文件尾，
+    实测一次吞掉 86 万字符 ⇒ 整份文件"没有引用"，把 0 读成干净。所以块注释先整段删。
+    """
+    src = re.sub(r"/\*.*?\*/", u"", src, flags=re.S)
+    src = re.sub(r"//[^\n]*", u"", src)
+    return src
+
+
+LITERAL_RX = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
+
+
+def swift_units(path):
+    """按 `func` 切成单元（函数级而不是文件级 —— 整个 harness 是一个文件几百个测试，
+    文件级判"只引用同组两张"永远不会命中，那种 0 是假干净）。"""
+    src = strip_swift_comments(io.open(path, encoding="utf-8", errors="replace").read())
+    units = []
+    for m in re.finditer(r"(?m)^[ \t]*(?:@\w+[ \t]*)?(?:private |fileprivate |internal |public )?func\s+([A-Za-z_]\w*)",
+                         src):
+        name = m.group(1)
+        line = src[:m.start()].count(u"\n") + 1
+        depth = 0
+        started = False
+        end = len(src)
+        for i in range(m.end(), len(src)):
+            ch = src[i]
+            if ch == u"{":
+                depth += 1
+                started = True
+            elif ch == u"}":
+                depth -= 1
+                if started and depth == 0:
+                    end = i + 1
+                    break
+        units.append((name, line, src[m.start():end]))
+    return units
+
+
+def swift_refs_and_shapes(text):
+    """一个单元里引用的夹具键 + 两种"认不出"的形状计数（拼接 `+` 与插值 `\\(`）。"""
+    refs = set()
+    for lit in LITERAL_RX.findall(text):
+        for token in re.findall(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+", lit):
+            refs.add(token)
+    concat = len(re.findall(r'"\s*\+|\+\s*"', text))
+    interp = len(re.findall(r"\\\(", text))
+    return refs, concat, interp
+
+
+def witness_reds(rows, python_dir, swift_dir, self_path, corpus_keys=()):
     """R-c：判据只引用某一组里的副本（≥2 张且全在同一组内）⇒ 它拿同图互证，恒真。
 
     「组外第三张」的口径挂在**现读语料的键**上，不是挂在名册上：判据引用了一张真存在的、
     不在这组里的帧，它就还有别的证人，这一条就不许红。名册之外的那张帧同样算组外。
+
+    R590 / 靶 1：扫描面是**读数**，不是默认值。python 侧与 Swift 侧分开数、分开出声，
+    Swift 树不在就叫 `swift=absent`（那一维不判），不许让"python 侧 0 条"被读成"全仓 0 条"。
     """
     keyed = [(sorted(set(frame_key(m) for m in row[u"members"])), row) for row in rows]
     universe = set(corpus_keys)
@@ -190,24 +245,43 @@ def witness_reds(rows, scripts_dir, self_path, corpus_keys=()):
         # 反过来 `row-text-300x74` 那种带尺寸的写法要能认（夹具键就是它的前缀）。
         return set(k for k in keys for r in refs if r == k or r.startswith(k + u"-"))
 
-    reds = []
-    for name in sorted(os.listdir(scripts_dir)):
-        if not name.endswith(u".py"):
-            continue
-        path = os.path.join(scripts_dir, name)
-        if os.path.abspath(path) == os.path.abspath(self_path):
-            continue
-        refs = referenced_keys(path)
+    reds, scope = [], {u"python_files": 0, u"swift_files": 0, u"swift_units": 0,
+                       u"swift_concat": 0, u"swift_interp": 0, u"swift_present": False}
+
+    def judge_unit(label, refs):
         hit_any = refs_in(refs, universe)
         if len(hit_any) < 2:
-            continue
+            return
         for keys, _row in keyed:
             hit = refs_in(refs, keys)
             if len(hit) >= 2 and hit == hit_any:
                 reds.append(u"%s 的像素证人只落在名册那一组副本里的 %s（它们逐字节同一）⇒ 没有组外第三张帧，"
-                            u"这条断言恒真" % (os.path.relpath(path, REPO), u"+".join(sorted(hit))))
-                break
-    return reds
+                            u"这条断言恒真" % (label, u"+".join(sorted(hit))))
+                return
+
+    if python_dir and os.path.isdir(python_dir):
+        for name in sorted(os.listdir(python_dir)):
+            if not name.endswith(u".py"):
+                continue
+            path = os.path.join(python_dir, name)
+            if os.path.abspath(path) == os.path.abspath(self_path):
+                continue
+            scope[u"python_files"] += 1
+            judge_unit(os.path.relpath(path, REPO), referenced_keys(path))
+    if swift_dir and os.path.isdir(swift_dir):
+        scope[u"swift_present"] = True
+        for dp, _d, fns in os.walk(swift_dir):
+            for fn in sorted(fns):
+                if not fn.endswith(u".swift"):
+                    continue
+                scope[u"swift_files"] += 1
+                for name, line, text in swift_units(os.path.join(dp, fn)):
+                    scope[u"swift_units"] += 1
+                    refs, concat, interp = swift_refs_and_shapes(text)
+                    scope[u"swift_concat"] += concat
+                    scope[u"swift_interp"] += interp
+                    judge_unit(u"%s:%s func %s" % (os.path.relpath(os.path.join(dp, fn), REPO), line, name), refs)
+    return reds, scope
 
 
 def main(argv=None):
@@ -215,6 +289,8 @@ def main(argv=None):
     ap.add_argument(u"--shots", default=os.environ.get(u"CLIPBOARD_HISTORY_UI_SHOTS") or u"")
     ap.add_argument(u"--roster", default=ROSTER)
     ap.add_argument(u"--scripts", default=SCRIPTS)
+    ap.add_argument(u"--swift", default=SWIFT_TESTS,
+                    help=u"Swift 测试树根（R-c 的第二块扫描面）；目录不在就叫 swift=absent，那一维不判")
     ap.add_argument(u"--fixture-dir", default=None,
                     help=u"正对照：额外扫一份合成语料/合成判据目录，证明这把尺看得见违规（0 要分得开「没有」与「看不见」）")
     args = ap.parse_args(argv)
@@ -253,10 +329,20 @@ def main(argv=None):
     present_names = set(hashes)
     counts, reds = judge(copies, mine, present_names)
 
-    # R-c 的证人只在**判据自己引用了帧**时才判得到，所以引用数必须一起印出来（0 也要能区分成因）。
-    wr = witness_reds(rows, args.scripts, os.path.abspath(__file__),
-                      corpus_keys=set(frame_key(n) for n in hashes))
+    # R-c 的证人只在**判据自己引用了帧**时才判得到，所以**扫描面本身要当读数印出来**（R590 靶 1）：
+    # 这一维的 0 今天只能说"python 侧没有只拿同图互证的断言"，不能说"全仓干净"——
+    # 这 8 组帧的像素证人主要住在 Swift 测试树里（`UICaptureHarness.swift` 那几百个 func）。
+    wr, scope = witness_reds(rows, args.scripts, args.swift, os.path.abspath(__file__),
+                             corpus_keys=set(frame_key(n) for n in hashes))
     reds.extend(wr)
+    print(u"WITNESS_SCAN_SCOPE python文件=%d swift文件=%d swift函数=%d 拼接点=%d 插值点=%d"
+          % (scope[u"python_files"], scope[u"swift_files"], scope[u"swift_units"],
+             scope[u"swift_concat"], scope[u"swift_interp"]))
+    if not scope[u"swift_present"]:
+        print(u"WITNESS_SWIFT_NOT_RUN=%s ⇒ Swift 那一维今天不判，`唯一证人` 只覆盖 python 侧" % (args.swift or u"（没给）",))
+    if scope[u"swift_concat"] or scope[u"swift_interp"]:
+        print(u"WITNESS_SWIFT_PARTIAL=拼接 %d 处 / 插值 %d 处 ⇒ 这两种写法里的键**可能**没被认出来，"
+              u"这一维的 0 是「下界」而不是「全仓没有」" % (scope[u"swift_concat"], scope[u"swift_interp"]))
 
     print(u"IDENTICAL_PAIRS png=%d 夹具键=%d 逐字节同图组=%d 本机名册行=%d 未登记=%d 漂了=%d 名册帧缺失=%d "
           u"不该相同=%d 唯一证人=%d"

@@ -17,7 +17,9 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.identical_frame_witness import (REPO, frame_key, judge, load_roster, main,   # noqa: E402
-                                             sha_groups, copy_groups)
+                                             sha_groups, copy_groups, witness_reds,
+                                             swift_units, swift_refs_and_shapes)
+from scripts.identical_frame_witness import SWIFT_TESTS as SWIFT_TESTS_DIR   # noqa: E402
 from scripts.frame_baseline import machine_key          # noqa: E402
 
 SCRIPTS_DIR = os.path.join(REPO, "scripts")
@@ -213,8 +215,13 @@ class MachineTests(unittest.TestCase):
 
     def test_rows_from_another_machine_are_not_judged_here(self):
         d = make_corpus(self.tmp, [(u"a-10x10-dark.png", 7), (u"b-10x10-dark.png", 7)])
+        # 从前这里写死 `github-runner` —— 而 runner 上 `machine_key()` 恰好就是它，
+        # 于是"他机行"变成"本机行"，这一格在 runner 上判的是**自己**（实测 本机行=1 他机行=0）。
+        # 他机的名字必须由本机现读再取反，不许从记忆里抄。
+        other = machine_key() + u"-not-this-machine"
+        self.assertNotEqual(machine_key(), other)
         roster = make_roster(self.tmp, [row(u"a-10x10-dark.png", u"b-10x10-dark.png",
-                                            machine=u"github-runner")])
+                                            machine=other)])
         rc, out = _capture(main, [u"--shots", d, u"--roster", roster,
                                   u"--scripts", os.path.join(self.tmp, "empty_scripts")])
         self.assertEqual(2, rc, out)
@@ -253,7 +260,7 @@ class WitnessTests(unittest.TestCase):
         scripts = self._scripts_with(
             u"# 合成判据\nTARGETS = [u\"qa-focus\", u\"qa-hover\"]\nprint(u\"FAKE 对照=%s\" % TARGETS)\n")
         from scripts.identical_frame_witness import witness_reds
-        reds = witness_reds(rows, scripts, os.path.abspath(__file__))
+        reds, _scope = witness_reds(rows, scripts, None, os.path.abspath(__file__))
         self.assertEqual(1, len(reds), reds)
         self.assertIn(u"恒真", reds[0])
         self.assertIn(u"qa-focus+qa-hover", reds[0])
@@ -264,8 +271,9 @@ class WitnessTests(unittest.TestCase):
         scripts = self._scripts_with(
             u"TARGETS = [u\"qa-focus\", u\"qa-hover\", u\"qc-list\"]\nprint(u\"FAKE\")\n")
         from scripts.identical_frame_witness import witness_reds
-        self.assertEqual([], witness_reds(rows, scripts, os.path.abspath(__file__),
-                                         corpus_keys=[u"qa-focus", u"qa-hover", u"qc-list"]))
+        reds, _scope = witness_reds(rows, scripts, None, os.path.abspath(__file__),
+                                    corpus_keys=[u"qa-focus", u"qa-hover", u"qc-list"])
+        self.assertEqual([], reds)
 
     def test_criterion_using_a_single_copy_is_not_accused(self):
         """引用组里**一张**是允许的（它仍在替那条断言作证）—— 这条负半防的是把名册当成"这些帧不许用"。"""
@@ -273,7 +281,9 @@ class WitnessTests(unittest.TestCase):
             row(u"qa-focus-420x300-dark.png", u"qa-hover-420x300-dark.png")]))
         scripts = self._scripts_with(u"TARGET = u\"qa-focus\"\nprint(u\"FAKE\")\n")
         from scripts.identical_frame_witness import witness_reds
-        self.assertEqual([], witness_reds(rows, scripts, os.path.abspath(__file__)))
+        reds, _scope = witness_reds(rows, scripts, None, os.path.abspath(__file__),
+                                      corpus_keys=[u"qa-focus", u"qa-hover"])
+        self.assertEqual([], reds)
 
     def test_plain_words_are_not_mistaken_for_frame_keys(self):
         """键必须带连字符才参与匹配 —— 否则一句 `print("focus")` 就被判成"拿副本作证"，
@@ -282,7 +292,9 @@ class WitnessTests(unittest.TestCase):
             row(u"qa-focus-420x300-dark.png", u"qa-hover-420x300-dark.png")]))
         scripts = self._scripts_with(u"WORD = u\"focus\"\nprint(u\"FAKE\")\n")
         from scripts.identical_frame_witness import witness_reds
-        self.assertEqual([], witness_reds(rows, scripts, os.path.abspath(__file__)))
+        reds, _scope = witness_reds(rows, scripts, None, os.path.abspath(__file__),
+                                      corpus_keys=[u"qa-focus", u"qa-hover"])
+        self.assertEqual([], reds)
 
 
 class NotRunTests(unittest.TestCase):
@@ -362,24 +374,190 @@ class CommittedRosterTests(unittest.TestCase):
                          frame_key(u"general-min-orphan-legacy-640x540-dark.png"))
 
     def test_working_corpus_either_judges_or_names_why_it_did_not(self):
-        """真语料那一格：**有帧就判组数==名册行，没帧就具名「没跑」** —— 两个分支都是断言，没有 skip。
+        """真语料那一格：**有 png 就判组数==名册行，没目录或目录里没 png 都具名「没跑」** —— 三个分支都是断言，没有 skip。
 
-        这一格是 runner 与本机的分水岭：CI 把捕获步骤那批帧交给电池（`CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci`），
+        这一格本轮红过一次，红的是我自己写的分支条件：只判了 `isdir`，而捕获正在进行时目录**已经建好但还没 png**
+        ⇒ 尺报 `REFUSED=no-png`（rc=2），我却断言 `RESULT=ok` ⇒ 假红在判据自己身上。
+        "目录在"与"有对象"是两格账（R557 那一族：读不到要拆成修法相反、有名字的几种出口）。
+
+        这一格也是 runner 与本机的分水岭：CI 把捕获步骤那批帧交给电池（`CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci`），
         本机若不设这个变量就只能读到 `REFUSED=no-shots`。把"本机没帧"读成"名册没问题"就是 R470 那一族。
         """
         shots = os.environ.get(u"CLIPBOARD_HISTORY_UI_SHOTS") or u""
-        argv = [u"--shots", shots, u"--roster", ROSTER_PATH, u"--scripts", SCRIPTS_DIR]
-        rc, out = _capture(main, argv)
-        if not shots or not os.path.isdir(shots):
+        rc, out = _capture(main, [u"--shots", shots, u"--roster", ROSTER_PATH, u"--scripts", SCRIPTS_DIR])
+        pngs = 0
+        if shots and os.path.isdir(shots):
+            pngs = len([f for f in os.listdir(shots) if f.endswith(u".png")])
+        if pngs == 0:
             self.assertEqual(2, rc, out)
-            self.assertIn(u"IDENTICAL_PAIR_REFUSED=no-shots", out)
+            self.assertIn(u"IDENTICAL_PAIR_REFUSED=", out)
+            self.assertIn(u"no-shots" if not shots else u"no-png", out)
+            return
+        # 第四个出口（runner 实测就落在这里）：**有对象，但这台机器没有自己的行** ⇒ 尺给 not-run。
+        # 从前这一支被并到「ok 那一支的断言」里，于是 runner 上名册本机行=0 读成判据红 ——
+        # 那是把"这台没登记"冒充成"登记有问题"（658 那一族的机器版）。
+        mine = [r for r in load_roster(ROSTER_PATH)
+                if str(r.get(u"machine") or u"") == machine_key()]
+        if not mine:
+            self.assertEqual(2, rc, out)
+            self.assertIn(u"IDENTICAL_PAIR_RESULT=not-run 本机行=0", out, out[-1500:])
+            self.assertIn(u"本机=%s" % machine_key(), out)
             return
         self.assertIn(u"IDENTICAL_PAIR_RESULT=ok", out, out[-1500:])
         counts = dict((k, int(v)) for k, v in
                       re.findall(u"(未登记|漂了|名册帧缺失|不该相同|唯一证人)=(\\d+)", out))
         self.assertEqual({k: 0 for k in counts}, counts, out[-1500:])
         self.assertEqual(8, int(re.search(u"逐字节同图组=(\\d+)", out).group(1)),
-                         u"真语料现在应当仍是 8 组（U-2440 / R588 / 本笔三次同数）")
+                         u"真语料现在应当仍是 8 组（U-2440 / R588 / R589 三次同数）")
+
+
+class SwiftScopeTests(unittest.TestCase):
+    """R590 / 靶 1：`唯一证人=0` 以前只是 **python 侧**的读数，而这一维的证人主要住在 Swift 测试树里。
+
+    这一族的名字是「扫描面要当读数印出来」—— 0 必须先说清它是在哪一块面上数的（R578/M1519 那一族）。
+    """
+
+    def setUp(self):
+        self._ctx = tempfile.TemporaryDirectory()
+        self.tmp = self._ctx.name
+        self.py = os.path.join(self.tmp, "py")
+        self.sw = os.path.join(self.tmp, "swift")
+        os.makedirs(self.py)
+        os.makedirs(self.sw)
+        self.rows = load_roster(make_roster(self.tmp, [
+            row(u"qa-focus-420x300-dark.png", u"qa-hover-420x300-dark.png")]))
+
+    def tearDown(self):
+        self._ctx.cleanup()
+
+    def _swift(self, name, body):
+        io.open(os.path.join(self.sw, name), "w", encoding="utf-8").write(body)
+
+    def test_a_swift_function_using_only_the_copies_is_red(self):
+        self._swift(u"Fake.swift", u'''
+final class FakeTests: XCTestCase {
+    func testOnlyCopies() {
+        let a = "qa-focus-420x300-dark"
+        let b = "qa-hover-420x300-dark"
+        XCTAssertNotEqual(a, b)
+    }
+}
+''')
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        reds, scope = witness_reds(self.rows, self.py, self.sw, os.path.abspath(__file__),
+                                     corpus_keys=[u"qa-focus", u"qa-hover"])
+        self.assertEqual(1, len(reds), reds)
+        self.assertIn(u"func testOnlyCopies", reds[0])
+        self.assertIn(u"qa-focus+qa-hover", reds[0])
+        self.assertEqual(1, scope[u"swift_files"])
+        self.assertEqual(1, scope[u"swift_units"])
+
+    def test_a_swift_function_with_a_third_frame_outside_the_group_is_green(self):
+        self._swift(u"Fake.swift", u'''
+final class FakeTests: XCTestCase {
+    func testWithThirdFrame() {
+        let a = "qa-focus-420x300-dark"
+        let b = "qa-hover-420x300-dark"
+        let c = "qc-list-420x300-dark"
+        XCTAssertNotEqual(a, c)
+    }
+}
+''')
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        reds, _scope = witness_reds(self.rows, self.py, self.sw, os.path.abspath(__file__),
+                                      corpus_keys=[u"qa-focus", u"qa-hover", u"qc-list"])
+        self.assertEqual([], reds)
+
+    def test_block_comments_are_stripped_before_line_comments(self):
+        """R578 那一课的复发证人：块注释里那句 `//` 若先被行注释规则吃掉，整份文件会"没有引用"。
+
+        这里把违规函数放在块注释**之后**：剥错顺序 ⇒ 后面全被吞 ⇒ 0 条红（假干净）；
+        剥对顺序（先块后行）⇒ 那一格必须红。
+        """
+        self._swift(u"Fake.swift", u'''
+/* 说明：这一段的 // 不是行注释的开始
+   它只是注释文字里出现了一次 //
+*/
+final class FakeTests: XCTestCase {
+    func testAfterBlockComment() {
+        let a = "qa-focus-420x300-dark"
+        let b = "qa-hover-420x300-dark"
+        XCTAssertNotEqual(a, b)
+    }
+}
+''')
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        reds, _scope = witness_reds(self.rows, self.py, self.sw, os.path.abspath(__file__),
+                                      corpus_keys=[u"qa-focus", u"qa-hover"])
+        self.assertEqual(1, len(reds), reds)
+        self.assertIn(u"testAfterBlockComment", reds[0])
+
+    def test_keys_inside_a_block_comment_are_not_references(self):
+        """R578 那一族的**判别格**：块注释里那两个键**不算**引用 ⇒ 不许红。
+
+        为什么这一格才是"剥错顺序会红"的证人（而上面 `test_block_comments_are_stripped_before_line_comments`
+        不是 —— 我写完才发现它两种顺序都红，等于没有牙）：
+        块注释里故意放一个 `//`。先剥行注释时那一行被截断，块注释的收尾 `*/` 留在正文里，
+        于是注释体里那两个键变成"活代码"⇒ 误报红。先剥块注释才拿掉得干净。
+        """
+        self._swift(u"Fake.swift", u'''
+/* 说明 // 这一行里有个行注释符，但它整段都是块注释
+   里面有 "qa-focus-420x300-dark" 与 "qa-hover-420x300-dark" 两个键，它们不是引用 */
+final class FakeTests: XCTestCase {
+    func testNothing() {
+        let x = 1
+    }
+}
+''')
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        reds, _scope = witness_reds(self.rows, self.py, self.sw, os.path.abspath(__file__),
+                                    corpus_keys=[u"qa-focus", u"qa-hover"])
+        self.assertEqual([], reds, u"注释里的键被当成引用了 ⇒ 剥注释的顺序又反了：%s" % reds)
+
+    def test_scope_line_and_the_two_named_absences_are_printed(self):
+        """`WITNESS_SCAN_SCOPE` 是**读数**；Swift 树不在 ⇒ `WITNESS_SWIFT_NOT_RUN`，不许把那一个 0 当全仓的 0。"""
+        shots = make_corpus(self.tmp, [(u"qa-focus-420x300-dark.png", 7), (u"qa-hover-420x300-dark.png", 7)])
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        rc, out = _capture(main, [u"--shots", shots, u"--roster", make_roster(self.tmp, [
+            row(u"qa-focus-420x300-dark.png", u"qa-hover-420x300-dark.png")]),
+            u"--scripts", self.py, u"--swift", os.path.join(self.tmp, "nope")])
+        self.assertIn(u"WITNESS_SCAN_SCOPE python文件=1 swift文件=0 swift函数=0", out)
+        self.assertIn(u"WITNESS_SWIFT_NOT_RUN=", out)
+        self.assertIn(u"那一维今天不判", out)
+        self.assertNotIn(u"WITNESS_SWIFT_PARTIAL", out)
+
+    def test_the_real_swift_tree_reports_a_lower_bound_not_a_zero(self):
+        """真树那一格：Swift 侧有拼接/插值写法 ⇒ 必须自己说出"这个 0 是下界"。"""
+        if not os.path.isdir(SWIFT_TESTS_DIR):
+            self.skipTest(u"Swift 测试树不在 ⇒ 这一格没有对象")
+        shots = make_corpus(self.tmp, [(u"qa-focus-420x300-dark.png", 7), (u"qa-hover-420x300-dark.png", 7)])
+        io.open(os.path.join(self.py, "quiet.py"), "w", encoding="utf-8").write(u"x = 1\n")
+        rc, out = _capture(main, [u"--shots", shots, u"--roster", make_roster(self.tmp, [
+            row(u"qa-focus-420x300-dark.png", u"qa-hover-420x300-dark.png")]),
+            u"--scripts", self.py, u"--swift", SWIFT_TESTS_DIR])
+        m = re.search(u"swift函数=(\\d+)", out)
+        self.assertTrue(m and int(m.group(1)) > 500, out[:400])
+        self.assertIn(u"WITNESS_SWIFT_PARTIAL=", out)
+
+    def test_the_two_real_harness_functions_are_not_accused(self):
+        """真树里那两个用 focus/hover 的判据**各自都有组外第三张**（`quickpick-list`）⇒ 不许红。
+
+        这一格是"扩了扫描面之后仍然不误伤"的负半证人：监工点名的两处（UICaptureHarness.swift:5470/:6083）
+        被认出来了，但它们有第三张帧作证，所以 `唯一证人` 不该因为它们而响。
+        """
+        harness = os.path.join(SWIFT_TESTS_DIR, "ClipboardHistoryAppTests", "UICaptureHarness.swift")
+        if not os.path.isdir(SWIFT_TESTS_DIR):
+            self.skipTest(u"Swift 测试树不在 ⇒ 这一格没有对象")
+        rows = load_roster(ROSTER_PATH)
+        found = []
+        for name, line, text in swift_units(harness):
+            refs, _c, _i = swift_refs_and_shapes(text)
+            if u"quickpick-search-hover" in refs or u"quickpick-search-focus" in refs:
+                found.append((name, line, refs))
+        self.assertEqual(2, len(found), u"现读到的函数=%s" % ([f[0] for f in found],))
+        reds, _scope = witness_reds(rows, os.path.join(self.tmp, "empty_py"), SWIFT_TESTS_DIR,
+                                    os.path.abspath(__file__))
+        self.assertEqual([], [r for r in reds if u"quickpick-search" in r], reds)
 
 
 def _capture(fn, argv):

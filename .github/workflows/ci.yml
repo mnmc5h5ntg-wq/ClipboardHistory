@@ -438,7 +438,8 @@ jobs:
           for GUARD in scripts/tier_reporting_shape.py scripts/stage_gate_claims.py; do
             "$PY" "$GUARD" 2>&1 | tee /tmp/guard_$(basename "$GUARD" .py).log
             g=${PIPESTATUS[0]}
-            echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g（0=判过 / 1=红 / 2=扫描器没有对象，不许当绿）"
+            echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g"
+            echo "  这一格的读法：rc=0 判过 / rc=1 红 / rc=2 扫描器没有对象，不许当绿"
             grep -E '^(TIER_SHAPE_|STAGE_GATE_)RESULT=' "/tmp/guard_$(basename "$GUARD" .py).log" \
               || { echo "SHAPE_GUARD_READING_MISSING=1 $GUARD 没打结论行 ⇒ 这一格按未读到处理"; exit 1; }
             # 「这一维没有对象」不许混在 ok 那一行里滑过去：链数=0 就是这把尺对 if 链是盲的，当场拦。
@@ -454,7 +455,8 @@ jobs:
           #   没有 png / 本机还没有自己的登记行 ⇒ 具名 NOT_RUN（绿，带读数）；真有红 ⇒ 红；尺崩了没打结论行 ⇒ 红。
           "$PY" scripts/identical_frame_witness.py --shots /tmp/shots-ci 2>&1 | tee /tmp/identical.log
           id_rc=${PIPESTATUS[0]}
-          echo "IDENTICAL_WITNESS_EXIT=$id_rc（0=本机全部登记 / 1=有红 / 2=这台机器没对象或没自己的行）"
+          echo "IDENTICAL_WITNESS_EXIT=$id_rc"
+          echo "  这一格的读法：rc=0 本机全部登记 / rc=1 有红 / rc=2 这台机器没对象或没自己的行"
           grep -E '^IDENTICAL_(PAIRS|PAIR_MACHINE|PAIR_RESULT|PAIR_REFUSED|PAIR_RED)' /tmp/identical.log \
             || { echo "IDENTICAL_WITNESS_READING_MISSING=1 尺没打结论行"; exit 1; }
           if [ "$id_rc" -eq 1 ]; then exit 1; fi

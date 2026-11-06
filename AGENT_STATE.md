@@ -12,7 +12,7 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-06（本地 · R589 / 第 588 轮 / Round 586）
+最后更新：2026-11-06（本地 · R590 / 第 589 轮 / Round 587）
 ## R570 ⓪ 开工（2026-11-04 · 第 569 轮 / Round 567 · 分岔证人那一跑还在 `in_progress` ⇒ 七格全部「未到数」，本轮先把证人做成不依赖它）
 
 ⓪·0 **身份现读**：UI_AUDIT 最新标题 = `## 第 568 轮（R569` ⇒ 本轮 **R570 = 第 569 轮 / Round 567**；`test_round_batch_consistency` 三格 OK；刀高水位现读 **M1488** ⇒ 本轮从 **M1489** 起；`PRODUCT_STREAK ledger_round=568 streak=1`（只抄门）。「最后更新」照旧**不在这一笔抬**（抬了 `back == 0` 就要求三本各有 R570 标题，而这一笔只动 STATE ⇒ 中间跑注定红；抬的时机 = 台账那一笔）。
@@ -309,6 +309,469 @@
     `PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED` 与 `FRAME_BASELINE_DRIFT_NOT_JUDGED` 四条一条没撤、
     着色器一字未写、这台机器的全局外观没动（656 那三条出路仍归用户）、
     **没删一张帧、没改基线名单、没跑 `frame_baseline.py update`**（638① 与 655 仍归用户）。
+
+## R590 状态（2026-11-06 · 第 589 轮 / Round 587 · 产品 0 文件 + **取证通道本身读不读得对对象**（本节① 兜底那一支从「有没有 `else`」改判成「出不出声」，`else: pass` 从此会红；本节② `唯一证人=0` 从 python-only 的读数变成带扫描面的读数，Swift 侧 159 文件 / 2108 函数接进来；本节③ ⓪ 那一跑自己揭出三条"尺在本机判、在 runner 上判的不是同一个对象"，三条都落地并各配一把刀）+ 判据卷 +11 格 + 刀 M1567–M1573 全 CAUGHT + ⓪ R589 两跑**都到数**（同一批四条红，逐字相同）
+
+⓪ **现读两对（`ci_status_r590.py`，两趟：12:21 那趟两跑都还 `in_progress` ⇒ 按未读处理；13:12 之后这趟两跑都到数）**：
+   1. `42159254212 ↔ 5fcac1c`（R589 主笔）⇒ `completed failure 5fcac1c`；全部失败步骤：`JOB build-and-test ⇒ failure、STEP[9] Release script tests ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`。
+      逐步骤结论（另取一趟 `jobs[].steps`，`steps` 视图不给成功步骤建行）：
+      `Release script tests ⇒ failure`、`Frame baseline vs working manifest ⇒ skipped`、`On-screen probe coverage floor ⇒ success`、`Swift tests (executed-count gate) ⇒ failure`。
+      **接线三态（这一格就是 R589 交下来的靶子本身）**：**①跑到了且印出了结论行（见 WIRE_READINGS）**
+      计数逐字：`{"TIER_SHAPE_RESULT": 2, "SHAPE_GUARD_EXIT": 2, "STAGE_GATE_RESULT": 2, "IDENTICAL_PAIR_RESULT": 4, "IDENTICAL_WITNESS_EXIT": 1, "IDENTICAL_WITNESS_NOT_RUN": 1}`；取处：按步骤名 `Release script tests` 命中 12 行；按前缀筛到的正文行 12 条
+      四条预测（标签与判法逐字接自 R589 的 `PREDICTIONS_R590`，由脚本判、不由我念）：
+      · STEP[11]（Frame baseline vs working manifest）里**第一次**出现 `FRAME_BASELINE_SCALE_B ⇒ **未读到（`CI_STEP_NOT_RUN` ⇒ 那一步没跑到，不判中/不中）**
+        （取处：Frame baseline vs working manifest ｜ 按步骤名 `Frame baseline vs working manifest` 命中 0 行；按前缀筛到的正文行 47 条）
+      · STEP[9] 里 `TIER_SHAPE_RESULT=ok` 且 `TIER_BRANCH_SCAN 分支链=` 的数字 ≥2 ⇒ 新加的 R3 那一维 ⇒ **中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 4 行；按前缀筛到的正文行 4 条）
+      · STEP[9] 里出现 `IDENTICAL_PAIR_RESULT=`（ok 或 not-run 都算出声）⇒ 638② 那条新守卫在 runner 上第 ⇒ **中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 6 行；按前缀筛到的正文行 6 条）
+      · STEP[9] 里 `SHAPE_GUARD_EXIT guard=… rc=0` 恰好两行 ⇒ 接线本身（而不是判据内容）的证人 ⇒ **读不到值（值槽被日志通道打死：`SHAPE_GUARD_EXIT guard=scripts/tier_reporting_shape.py rc=��0=判过 / 1=红 / 2=扫描器`）⇒ 不判中/不中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 2 行；按前缀筛到的正文行 2 条）
+   2. `42159607721 ↔ f477d96`（R589 补记笔）⇒ `completed failure f477d96`；全部失败步骤：`JOB build-and-test ⇒ failure、STEP[9] Release script tests ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[18] On-screen probe coverage floor ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`。
+      逐步骤结论：`Release script tests ⇒ failure`、`Frame baseline vs working manifest ⇒ skipped`、
+      `On-screen probe coverage floor ⇒ failure`、`Swift tests (executed-count gate) ⇒ failure`。
+      接线三态：**①跑到了且印出了结论行（见 WIRE_READINGS）**；计数逐字 `{"TIER_SHAPE_RESULT": 2, "SHAPE_GUARD_EXIT": 2, "STAGE_GATE_RESULT": 2, "IDENTICAL_PAIR_RESULT": 4, "IDENTICAL_WITNESS_EXIT": 1, "IDENTICAL_WITNESS_NOT_RUN": 1}`；取处：按步骤名 `Release script tests` 命中 12 行；按前缀筛到的正文行 12 条
+      四条预测与主跑**逐字同判**（②中 / ③中 / ④读不到值 / ①未读到）：
+      · STEP[11]（Frame baseline vs working manifest）里**第一次**出现 `FRAME_BASELINE_SCALE_B ⇒ **未读到（`CI_STEP_NOT_RUN` ⇒ 那一步没跑到，不判中/不中）**
+        （取处：Frame baseline vs working manifest ｜ 按步骤名 `Frame baseline vs working manifest` 命中 0 行；按前缀筛到的正文行 47 条）
+      · STEP[9] 里 `TIER_SHAPE_RESULT=ok` 且 `TIER_BRANCH_SCAN 分支链=` 的数字 ≥2 ⇒ 新加的 R3 那一维 ⇒ **中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 4 行；按前缀筛到的正文行 4 条）
+      · STEP[9] 里出现 `IDENTICAL_PAIR_RESULT=`（ok 或 not-run 都算出声）⇒ 638② 那条新守卫在 runner 上第 ⇒ **中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 6 行；按前缀筛到的正文行 6 条）
+      · STEP[9] 里 `SHAPE_GUARD_EXIT guard=… rc=0` 恰好两行 ⇒ 接线本身（而不是判据内容）的证人 ⇒ **读不到值（值槽被日志通道打死：`SHAPE_GUARD_EXIT guard=scripts/tier_reporting_shape.py rc=��0=判过 / 1=红 / 2=扫描器`）⇒ 不判中/不中**
+        （取处：Release script tests ｜ 按步骤名 `Release script tests` 命中 2 行；按前缀筛到的正文行 2 条）
+      两条跑之间的差（照实记，不判成因）：`On-screen probe coverage floor` 在主跑是 `success`、在补记笔是 `failure`
+      ⇒ 这是账里已有的"跑间漂"那一族（R540/R541 起就登记过），本笔不据此说它消失或成立。
+      两跑的 `STEP[9]` 红名**逐字相同四条**（`Ran 885 tests … FAILED (failures=4, skipped=3)` 两跑都是这个数）
+      ⇒ 下面 ⓪·3 那三条真红 + 一条借红是**稳定的**，不是偶发。
+   3. **主跑给的真缺陷（不是"没读到"，是"读到了并且错了"）**：`STEP[9]` 印出了 12 行结论行 ⇒ 接线是真的；
+      可同一跑里那一步**整步红**，红名逐字四条：
+      （两跑逐字相同，下面只列一次）
+      · `FAIL: test_the_same_machine_with_an_unmatched_corpus_must_go_red (test_ci_shape_guard_wiring.ExecutionTests)`
+        ⇒ 断言 `1 != 0`。这一格是 R589 派单第三件事② 要的那条**负半证人**，它在 runner 上**没有响**：
+        正文用的是盘上那份名册（8 行全 keyed `local:MacBook-Air.local`），而 runner 现读 `本机行=0` ⇒ 直接走 `not-run` 那一支、`rc=0`。
+      · `FAIL: test_working_corpus_either_judges_or_names_why_it_did_not (test_identical_frame_witness.CommittedRosterTests)`
+        ⇒ 断言里有 `IDENTICAL_PAIR_RESULT=ok` 而正文是 `… 本机行=0 他机行=8 本机组=20 … RESULT=not-run`。
+        这一格只分了两支（有 png 就判 ok），漏了第四种出口：**有对象但这台没有自己的行**。
+      · `FAIL: test_rows_from_another_machine_are_not_judged_here (test_identical_frame_witness.MachineTests)`
+        ⇒ 现读 `本机=github-runner 名册本机行=1 他机行=0`。这一格把"另一台"写死成 `github-runner`，
+        而 runner 的 `machine_key()` **恰好就是它** ⇒ 他机行变成自己行，判的对象整个换了。
+      · `FAIL: test_the_roster_matches_what_this_machine_actually_skips (test_skip_roster.SkipRosterTests)`
+        ⇒ 借红（634 那一格设计如此："红在内层不在这里"），把上面三条原样带出来 ⇒ 它不算第四条独立缺陷。
+      共同形状一句话：**三条红都是"尺在本机判、在 runner 上判的不是同一个对象"** —— 与本节①②是同一族，
+      只是这一族的样本这轮回来了（R589 只能预言，本轮有逐字读数）。本轮的处置见本节③。
+   4. **两条新通道的值槽在 runner 上被打死了**（字节级取证（`gh run view 42159254212 --log` 落盘后按字节读））：
+      `SHAPE_GUARD_EXIT guard=scripts/tier_reporting_shape.py rc=U+FFFDU+FFFD0=判过 / 1=红 / …`、
+      `IDENTICAL_WITNESS_EXIT=U+FFFDU+FFFD0=本机全部登记 / …` —— 源码里那两行是 `rc=$g（0=判过 …）`，
+      值槽与非 ASCII 说明**粘在同一个字段里**，日志通道把这一段整体弄坏 ⇒ `rc` 到底是 0 还是 2 从今天到数的那一跑里**读不出来**。
+      这是 R565 那条规矩（值槽只放一个词、说明另起一行）的 bash 版：R589 我用它改了自己写的 python 打印，
+      却没有照同样的规矩写自己新加的 echo。本轮已改（本节③），并配一格守卫 + 一把刀（M1572）。
+   5. `STEP[11]`（`Frame baseline vs working manifest`）在主跑里是 `skipped` ⇒ 那一格的三态是**第③态**（那一步根本没跑到，
+      因为 `STEP[9]` 先红）。所以 R589 交下来的第一条预测（`FRAME_BASELINE_SCALE_BASELINE_UNKNOWN` 第一次在 runner 出现）
+      **今天仍然没有证人**：只报数不拦路的那一格在 runner 上没跑过 ⇒ 不许写"接上了"，也不许写"它绿了"。
+   6. **R591 的 ⓪ 要读的五格**（判法与「正文从哪一步取」都写进 `ci_status_r590.py` 的 `PREDICTIONS_R591`，由脚本判）：
+      ①本笔（主笔 + 补记笔）的成对号 —— 由补记那一趟现取现写，本笔不许替它填数；
+      ②`STEP[9]` 的**四条红有没有减少**（不是看整步绿：那一步还挂着 `test_skip_roster` 的借红与 python 版本差那一族）；
+      ③`STEP[9]` 里 `SHAPE_GUARD_EXIT … rc=<一个词>` 与 `IDENTICAL_WITNESS_EXIT=<一个词>` **能不能读到值**（本轮修的正是这一格）；
+      ④`STEP[11]` 这次有没有跑到（跑到才有 `FRAME_BASELINE_SCALE_BASELINE_UNKNOWN`，runner 的基线说不出倍率、当轮 1.00x ⇒ 应该响）；
+      ⑤`WITNESS_SCAN_SCOPE … swift文件=` 有没有在 runner 上 >0（靶 1 那一维的第一条外部证人，只能由含本笔那一跑签）。
+
+① **真实推进（本节① / §3 第②段）：兜底那一支要「出声」，不是要「存在」**
+   `scripts/tier_reporting_shape.py` 的 R3 从前只问链尾有没有 `else`（`closed=has_else`）⇒ 把兜底写成 `else: pass`
+   照样绿，洞原样留着。本轮把判定改成 `body_speaks(catch, prefix)`：**要么 print 一个同前缀的通道串，要么退非 0 / 抛**；
+   两条都不做的兜底具名红「有 `else` 但兜底那一支不出声」，并把"空 else 把『其余情况』写成了『什么都不说』"写在正文里。
+   现读逐字：`TIER_SHAPE_SCAN 活仪器文件=40 档位循环=3 带return=0 无可数格=0 一次性脚本里的循环=32（只数不判）
+  逐字 scripts/frame_recording_proof.py:205 循环=205 return=[] 可数=有
+  逐字 scripts/heatmap_frame_levels.py:163 循环=163 return=[] 可数=有
+  逐字 scripts/hover_two_state_diff.py:195 循环=195 return=[] 可数=有
+TIER_BRANCH_SCAN 分支链=5（口径：按分支行号集合去重后的**候选链**条数，同一条长链的嵌套子串各算一次） 共读同量=5 无兜底=0 有兜底却不出声=0 正对照链=0（--extra 给了才有）
+  逐字链 scripts/frame_baseline.py:782 条数=9 前缀=FRAME_BASELINE_ 兜底=有 出声=有(print 同前缀) 共读=Name(id='current_scale', ctx; Subscript(value=Name(id='bak
+  逐字链 scripts/frame_baseline.py:826 条数=2 前缀=FRAME_BASELINE_SCALE_ 兜底=有 出声=有(print 同前缀) 共读=Subscript(value=Name(id='bak
+  逐字链 scripts/real_screen_control_chroma.py:301 条数=5 前缀=REALSCREEN_ 兜底=有 出声=有(print 同前缀) 共读=Name(id='outcome', ctx=Load(
+  逐字链 scripts/real_screen_control_chroma.py:319 条数=3 前缀=REALSCREEN_ 兜底=有 出声=有(print 同前缀) 共读=Name(id='outcome', ctx=Load(
+  逐字链 scripts/real_screen_control_chroma.py:326 条数=2 前缀=REALSCREEN_OUTCOME_ 兜底=有 出声=有(退非 0/抛) 共读=Name(id='outcome', ctx=Load(
+TIER_SHAPE_RESULT=ok 档位循环=3 全部逐档点名且缺席可数；分支链=5 全部有兜底且出声`（`有兜底却不出声` 那一格从此是读数；本轮全仓 0 条 ⇒ 这一维**有人判**）。
+   三格新判据：`test_an_empty_else_catch_all_is_red_and_named_as_silent`（空 else 必须红）、
+   `test_a_catch_all_that_returns_nonzero_counts_as_speaking`（合法拦路不许误报 = **负半**）、
+   `test_a_legit_empty_else_outside_a_reporting_chain_is_not_a_candidate`（兄弟分支不印同前缀的空 else **不是对象** ⇒
+   这就是派单要的那条"合法空 else 的负对照"：规矩只判"兄弟都印同一个前缀的那条链"，不逼每一朵 `if` 都配废话）。
+   刀 **M1567**（把 `frame_baseline.py` 的兜底换成 `pass` ⇒ 那一格必须红）、**M1568**（关掉"退非 0 也算出声" ⇒ 负半那格必须红）。
+
+② **真实推进（本节②）：`唯一证人=0` 是扫描面读数，不是「全仓干净」**
+   `scripts/identical_frame_witness.py` 以前只扫 `scripts/*.py` ⇒ 那句 `唯一证人=0` 的证据面**根本不含 Swift**，
+   而这一维的证人主要住在 `ClipboardHistory/Tests/**`。本轮把扫描面当**读数**印出来并接上 Swift 侧：
+   `WITNESS_SCAN_SCOPE python文件=40 swift文件=159 swift函数=2108 拼接点=6483 插值点=11510`
+   `IDENTICAL_PAIRS png=356 夹具键=178 逐字节同图组=8 本机名册行=8 未登记=0 漂了=0 名册帧缺失=0 不该相同=0 唯一证人=0`
+   Swift 侧认三种形状（`"键"` 字面量、字符串拼接 `+`、插值 `\(...)`)；剥注释**先块后行**（`strip_swift_comments`：
+   `/* … */` 之后再 `// …`，反序就会让块注释的结束符被当成行注释吃掉 —— R578 那次块注释吞 86 万字符的坑本轮不许复发，
+   由 `test_block_comments_are_stripped_before_line_comments` 与 `test_keys_inside_a_block_comment_are_not_references` 钉）。
+   认不出的部分**具名不判**而不是当 0：`WITNESS_SWIFT_NOT_RUN=`（没有 Swift 树）与 `WITNESS_SWIFT_PARTIAL=`
+   （拼接/插值点数 >0 ⇒ 这一维的 0 是**下界**而不是"全仓没有"）。正对照 python 与 Swift 各有真红的一格，
+   真树那一格（`test_the_two_real_harness_functions_are_not_accused`）判的是"两份真夹具不许被误指控"。
+   刀 **M1569**（扫描面退回只扫 python ⇒ Swift 正对照必须红，正是派单点名的那一把）、**M1570**（剥注释顺序换回"先行后块"）、
+   **M1571**（Swift 树缺席时不再具名 ⇒ 那一格必须红）。
+   ⚠ 诚实记一条：M1570 落刀时我原先当作证人的那两格合成样本**两序都红**（没有牙），真牙是
+   `test_the_two_real_harness_functions_are_not_accused`（真树上"行先剥"会把块注释尾巴里的字面量当引用 ⇒ 误指控）。
+   这条写进本节⑨·2，不写成"配了证人"。
+
+③ **真实推进（本节③）：⓪ 揭出的三条自伤，本轮全部落地并各配证人**
+   1. 负半证人不再抄盘上名册：`test_ci_shape_guard_wiring.ExecutionTests._run(shots, roster)` 自己造一份名册，
+      `machine` 字段**现读** `machine_key()` ⇒ 任何机器上都是"这台登记过却对不上"，那一支必须响。
+      证人=本笔落地前现跑（M1573 把它退回写死的外机 ⇒ 那格红）。
+   2. 第四种出口有了自己的分支：`test_working_corpus_either_judges_or_names_why_it_did_not` 现在分四支
+      （没目录 / 目录里 0 张 / 有 png 且这台有自己的行 ⇒ 判组数 / **有 png 但这台没有自己的行 ⇒ 具名 not-run 且 rc=2**），
+      后两支正是本机与 runner 的分水岭。
+   3. "另一台"不许从记忆里抄：`machine_key() + u"-not-this-machine"`，并当场 `assertNotEqual`。
+   4. 值槽与说明分开（③的那条通道缺陷）：`ci.yml` 两行 echo 改成
+      `SHAPE_GUARD_EXIT guard=$GUARD rc=$g` + 另起一行 `  这一格的读法：rc=0 判过 / rc=1 红 / rc=2 扫描器没有对象，不许当绿`；
+      `IDENTICAL_WITNESS_EXIT=$id_rc` 同形。新格 `test_no_channel_value_slot_is_glued_to_a_parenthetical_explanation`
+      判**接线正文**里这个形状，两种写法（`NAME=value（` 与 `NAME … rc=$v（`）都算，正对照先自证这把尺看得见。
+      ⚠ 这把尺自己也被 M1572 抓过一次盲：第一版只认 `NAME=` 紧跟值槽那一形 ⇒ 刀 PASSED（空刀），
+      修宽之后重落才 CAUGHT；刀号不重复占位，作废的是**当时那条结论**（见本节⑨·3）。
+   ⚠ 三条出路一条没选：638①、655/660 的重烤、656 的全局外观 —— 本轮帧数与名单一字未动。
+
+④ **验证链（顺序照派单）**：build `BUILD_WARNINGS=0` → 判据卷 `Ran 896 tests in 116.525s` → 刀 M1567–M1573（**落刀前现读高水位=M1566**，
+   跨表唯一性逐把现读=0 次撞号）→ 新表 `mutate_r590_scope` 在预检名册里（`NEEDLE_PRECHECK tables=403 arms=855 bad=0`，
+   本轮那 7 把逐把 `ok`）→ 刀已还原复跑判据 `Ran 896 tests in 116.787s`、`before=MD5 (scripts/ci_capture_gate.py) = ef3e1ad405c97cbbb6cc21349c4f532b
+MD5 (scripts/ci_channel_hygiene.py) = 6bdb302e4b062bcc9ea9460c2c6af5d1
+MD5 (scripts/ci_read.py) = a6b0e786a338d1c2001b64902a51ee96
+MD5 (scripts/ci_red_stability.py) = d506bb6a92a89ee23da9cf0163c426a2
+MD5 (scripts/commit_round_identity.py) = e88fd691b84430ddd4ed769e293e97ca
+MD5 (scripts/create_issues.py) = 207c5cea822994193a102281470df7bc
+MD5 (scripts/filmstrip_frames.py) = ba79d8b53c86dbd75853f50c19e9fa87
+MD5 (scripts/frame_audit.py) = f1d36e471a4b52f55bfd264fff49fb5a
+MD5 (scripts/frame_baseline.py) = 630cd54ab5543afae6ac4360b6ac540d
+MD5 (scripts/frame_recording_proof.py) = 007b46afd5e91eb58ac01ea0c03211ba
+MD5 (scripts/heatmap_frame_levels.py) = 754b3bd683d734d7870259c3592a9009
+MD5 (scripts/hidden_arms.py) = ccb8441100154129e7cfff29c50fc95f
+MD5 (scripts/hover_two_state_diff.py) = e64128f48847df15fa742397d0191015
+MD5 (scripts/identical_frame_witness.py) = 41513190b3e2dad3ff0d953f3d4623cc
+MD5 (scripts/launch_smoke.py) = 3ddedda4ebc66f0b10a5f8d740d89726
+MD5 (scripts/ledger_absence_claims.py) = eea2f83547164a93d790cfc9a0491f49
+MD5 (scripts/ledger_readings.py) = 8efd455b8fcf7fe0cb5808a69dc04297
+MD5 (scripts/ledger_round_headings.py) = 5bff763d8d0f3230e2350e64b417d56c
+MD5 (scripts/ledger_timing_scan.py) = b2c78f8d338345d0b14a4e8c34f0eb78
+MD5 (scripts/motion_floor_gate.py) = 18e87c666dc3517c8d1fa7cfc89ffd21
+MD5 (scripts/motion_red_occurrence.py) = ffa6e48ec77a697c912575f44cf77862
+MD5 (scripts/motion_surface_gate.py) = c505c66ecc0648f3430b7e2108f088c2
+MD5 (scripts/mutation_verdict_scan.py) = 682e3cedd840bdcb2391e88ba5aa7641
+MD5 (scripts/prepare_release.py) = 445ad07d8842a3846a8a01af0a24894d
+MD5 (scripts/probe_coverage_gate.py) = 7a76da9a3c45830d9a9262201ad1d8a0
+MD5 (scripts/proc_path.py) = 5b4948f0eec1a42362ff87577564d5eb
+MD5 (scripts/product_streak.py) = eda07a5a0a87d69f841ced8919aea6df
+MD5 (scripts/readings_roster_source.py) = ec321d006bcf72644654bb2573b68146
+MD5 (scripts/real_screen_control_chroma.py) = beb3879cea15c43a737ba62cd3bc1d4b
+MD5 (scripts/real_screen_filter_pill.py) = e9db27bf8fadf7e8ce307d2439a9521e
+MD5 (scripts/real_screen_fold_transition.py) = 820acc5874bb5e9d9dbc494b80c25dce
+MD5 (scripts/real_screen_recorder_ring.py) = ce5b1c18cfdc0009766079e28c710c14
+MD5 (scripts/real_screen_sidebar_icons.py) = 4d083dc6f3345951e8a86c2f2234d516
+MD5 (scripts/red_name_reconciliation.py) = 106e4177b0193711ba6cf97b241b33ea
+MD5 (scripts/report_sources_cell.py) = c2fa3b51476703b00b03f923e851c522
+MD5 (scripts/stage_gate_claims.py) = c241e632cf1f2a1dac8e248976dfe2ea
+MD5 (scripts/surface_left_axes.py) = f67f9cb069613eea588c3cf63190df9c
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthdead.py) = f8f4eb9cdcad36b4d0fb0c7020c3f6db
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthdeclared.py) = caf41c1505751f9c3015e23f84c52701
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthlive.py) = c7d9a735c1dc4d80060e02b3fd8c1f73
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthopaque.py) = b2c3f52b51e80f390bb8ee518d838ccd
+MD5 (scripts/tests/test_changelog_shape.py) = 4dd0b63a4a2fb44415c5b09f1a0095ae
+MD5 (scripts/tests/test_ci_capture_gate.py) = a0acad559e19145ddd5b283ff5004053
+MD5 (scripts/tests/test_ci_channel_hygiene.py) = 88ec5dfe59ad68865a68bd044a495a95
+MD5 (scripts/tests/test_ci_hover_wiring.py) = 339140d1f9cd4aa84d3b39c9ecf8c483
+MD5 (scripts/tests/test_ci_motion_print_wiring.py) = d4bc3541d781b72bb17e53003be61224
+MD5 (scripts/tests/test_ci_read_queue.py) = ef4534e09eaf6a4c6db4266b18ab5a38
+MD5 (scripts/tests/test_ci_read_reds.py) = 6148ce66b3ca452147922ba9f3947f92
+MD5 (scripts/tests/test_ci_red_stability.py) = 3815d3f66f559c80ca553e9748adba73
+MD5 (scripts/tests/test_ci_report_selftest.py) = e6bed78313cd21115f167491855cdbdc
+MD5 (scripts/tests/test_ci_shape_guard_wiring.py) = d0b401a9c9a7375f1f5432d46f13c1d8
+MD5 (scripts/tests/test_ci_workflow_shape.py) = 703dd197a7b94f3b6f4deee639769467
+MD5 (scripts/tests/test_commit_round_identity.py) = d28e0757391a50d83391ed07cb7b95ce
+MD5 (scripts/tests/test_commit_subject_hygiene.py) = 9a27af5f8a5c28c3914383861084b9f1
+MD5 (scripts/tests/test_create_issues.py) = 85f56b390f3a34e9d52c568b8fc9cc7e
+MD5 (scripts/tests/test_curve_gaps.py) = b232517c42bcf250fd616c11f898ee1b
+MD5 (scripts/tests/test_final_report_claims.py) = f24491699ebb8357a970c225b5892949
+MD5 (scripts/tests/test_final_report_headline.py) = d117425870198faec37f13bf85404e97
+MD5 (scripts/tests/test_final_report_section1_cell.py) = 27ea13c404d44d5d88aa638140718b50
+MD5 (scripts/tests/test_frame_audit.py) = b4681cf63ddbfd9f297145b9596dbf12
+MD5 (scripts/tests/test_frame_audit_bands.py) = bf21df3aa2a652c17e44d63da0f6e23a
+MD5 (scripts/tests/test_frame_baseline.py) = b803414af052632f1d4393b4f7fc2855
+MD5 (scripts/tests/test_frame_recording_proof.py) = 9eb7f16dfc157f94e423777fb2045831
+MD5 (scripts/tests/test_frames_path_hygiene.py) = a57a2c1876c8438e8f53f75c9dc2246d
+MD5 (scripts/tests/test_gate_marker_hygiene.py) = 031b51c232a38fe04ebf531bea96f643
+MD5 (scripts/tests/test_heatmap_frame_levels.py) = 97333fa4b5537ed5c732c93c41e16842
+MD5 (scripts/tests/test_hidden_arms.py) = 42444dbb9c6aa86e89302cb64074b4d7
+MD5 (scripts/tests/test_hover_capture_channel.py) = bfa87bb5f44bbef936a8519364990b40
+MD5 (scripts/tests/test_hover_two_state_diff.py) = 8b0c385b907933cc96d85e765e0e4d9f
+MD5 (scripts/tests/test_identical_frame_witness.py) = c744c279b5c054a1c40eebccc0a1d1c2
+MD5 (scripts/tests/test_install_local.py) = e72f4f689169b2f543b3503bacc2ad9f
+MD5 (scripts/tests/test_knife_guard.py) = 9a6ccd2a71604604889cbc0e99ba48a3
+MD5 (scripts/tests/test_launch_smoke.py) = d39f2d717e7d3536f6c7973d5e52e2f5
+MD5 (scripts/tests/test_ledger_absence_claims.py) = b0f4bf86c2711e218c645949c62a9a75
+MD5 (scripts/tests/test_ledger_citations.py) = 79f34770f36be0f7893dac5b48ec3d24
+MD5 (scripts/tests/test_ledger_generator_output.py) = 52731724ebc0e9e0ef758b63e761f3c2
+MD5 (scripts/tests/test_ledger_ids.py) = 47afcd61e1004b851fa79d6e28d24aea
+MD5 (scripts/tests/test_ledger_placeholders.py) = 9a1941897a04f08a0816d2e08ba966bc
+MD5 (scripts/tests/test_ledger_readings.py) = ca1ac8f2f6d1e1a311d00039e25a86f8
+MD5 (scripts/tests/test_ledger_round_headings.py) = f0dc0aca4db200f9ddd40bb15de5b05f
+MD5 (scripts/tests/test_ledger_rows_keys.py) = f529cbf39688bff0579b959a666057ac
+MD5 (scripts/tests/test_ledger_timing_scan.py) = cb386b657461c68a62b9040a05ce8395
+MD5 (scripts/tests/test_ledger_tokens.py) = 2b14a884a6aec7cdbc34019088b6f4b8
+MD5 (scripts/tests/test_make_info_plist.py) = 98bc29127994bee2acbdde820347e370
+MD5 (scripts/tests/test_motion_floor_gate.py) = d2d9a0e4be0e0c9f3b7e3517ad852714
+MD5 (scripts/tests/test_motion_red_occurrence.py) = 82481f4ba078ce46f74204d01a24ea05
+MD5 (scripts/tests/test_motion_surface_gate.py) = 6595bb9951fe457241bd5ff5762615ad
+MD5 (scripts/tests/test_motion_surface_gate_list_open.py) = 41d8ba51f92cf06557dbaec4ab09c459
+MD5 (scripts/tests/test_motion_surface_gate_retirement.py) = 9e79cb0d1824a88b8e4ab3b50798c046
+MD5 (scripts/tests/test_mutate_arm_registry.py) = 87b3705ca7e09f77bff8b1c7750e48dd
+MD5 (scripts/tests/test_mutate_r271_needle.py) = 540764f816ffe1ab59ab1e25de179bae
+MD5 (scripts/tests/test_mutation_readback.py) = 731f09afd71e201561796167f6c2b306
+MD5 (scripts/tests/test_mutation_readout.py) = a298c2b19b8475e6ded7e1d371521267
+MD5 (scripts/tests/test_mutation_summary_regex.py) = f1137ce31954131aa04975cf7c48084d
+MD5 (scripts/tests/test_mutation_verdict_scan.py) = b569a836cee72efc9338f7776fec4e2b
+MD5 (scripts/tests/test_prepare_release.py) = 9f66fa68b4166585b9f062e526a2a789
+MD5 (scripts/tests/test_probe_coverage_gate.py) = 1bbe28bbda10ff72dec697f4911a5878
+MD5 (scripts/tests/test_product_streak_cell.py) = 50a0a0246b0dd470a97742c8895fcbce
+MD5 (scripts/tests/test_readings_channel_coverage.py) = 11a22e6715a92b1128429118ab8b7912
+MD5 (scripts/tests/test_real_screen_chroma_verdict.py) = e0861479ac434a456fe9ba92316fa2ff
+MD5 (scripts/tests/test_real_screen_filter_pill.py) = 55df954bf83a7b40833ef386e635c7f1
+MD5 (scripts/tests/test_real_screen_identity.py) = 087ff74cf652eccf896d3038a59f28b3
+MD5 (scripts/tests/test_real_screen_probe.py) = 37f501158251953e359a3e99ad98b00a
+MD5 (scripts/tests/test_real_screen_ring_verdict.py) = e304cc45b040ebfe7194280468bc3962
+MD5 (scripts/tests/test_red_name_reconciliation.py) = 7239220678d01b3ca0c38395c73b11ce
+MD5 (scripts/tests/test_round_batch_consistency.py) = 36d7f713731511c3131169e701c90101
+MD5 (scripts/tests/test_round_batch_declaration.py) = fe355c984264002ba089894d4e11cc9e
+MD5 (scripts/tests/test_round_claim_consistency.py) = 58a51da386da53cf98109200560264d3
+MD5 (scripts/tests/test_round_verify_frame_gate.py) = 9be57107ebb195c86c9446924d7e80dc
+MD5 (scripts/tests/test_script_help_runs.py) = b2ac56006c0565cb8823657ae53bea16
+MD5 (scripts/tests/test_sign_bundle.py) = 2b8089fcaaf65c41bf37154ab5721c29
+MD5 (scripts/tests/test_skip_roster.py) = c6bab9ef994527d946f6ffb62fe5dbbc
+MD5 (scripts/tests/test_sources_cell_second_source.py) = fc982f1ae2c2ec753947365e1f279010
+MD5 (scripts/tests/test_stage_gate_claims.py) = a165e3132ef76e73b4a4f971de9c7c54
+MD5 (scripts/tests/test_surface_left_axes.py) = 60f3ce4496b633507a914afafa08ecbc
+MD5 (scripts/tests/test_tier_reporting_shape.py) = 70d54b2807777330240cd3914c5ad24d
+MD5 (scripts/tests/test_tier_vocabulary.py) = 5427b154788cda7f63edef077c7f87e2
+MD5 (scripts/tests/test_ui_probe_report.py) = 82b34abf2f251281e993dae1fd607d5d
+MD5 (scripts/tests/test_ui_round_interval_parity.py) = e44c090c930c776993d9b61e792bf8b2
+MD5 (scripts/tests/test_wait_scan.py) = 1cd910848dc92226732450169f2ee332
+MD5 (scripts/tests/test_zero_floor_guard.py) = 340df719753ba6ebb296ccb8e81a9874
+MD5 (scripts/tier_reporting_shape.py) = 3b0888fd27aad312760b110c7ab46820
+MD5 (scripts/tier_vocabulary.py) = 0ed85312da0d34a7dc85ac67431cb3a5
+MD5 (scripts/ui_probe_report.py) = e81b08e7f283fdcfe83c0d209a614770
+MD5 (scripts/wait_scan.py) = 5bcd51998dc4d4414670daf20041e4e7
+3a1c59a110f53d9ace0a9c36f5029e70 after=MD5 (scripts/ci_capture_gate.py) = ef3e1ad405c97cbbb6cc21349c4f532b
+MD5 (scripts/ci_channel_hygiene.py) = 6bdb302e4b062bcc9ea9460c2c6af5d1
+MD5 (scripts/ci_read.py) = a6b0e786a338d1c2001b64902a51ee96
+MD5 (scripts/ci_red_stability.py) = d506bb6a92a89ee23da9cf0163c426a2
+MD5 (scripts/commit_round_identity.py) = e88fd691b84430ddd4ed769e293e97ca
+MD5 (scripts/create_issues.py) = 207c5cea822994193a102281470df7bc
+MD5 (scripts/filmstrip_frames.py) = ba79d8b53c86dbd75853f50c19e9fa87
+MD5 (scripts/frame_audit.py) = f1d36e471a4b52f55bfd264fff49fb5a
+MD5 (scripts/frame_baseline.py) = 630cd54ab5543afae6ac4360b6ac540d
+MD5 (scripts/frame_recording_proof.py) = 007b46afd5e91eb58ac01ea0c03211ba
+MD5 (scripts/heatmap_frame_levels.py) = 754b3bd683d734d7870259c3592a9009
+MD5 (scripts/hidden_arms.py) = ccb8441100154129e7cfff29c50fc95f
+MD5 (scripts/hover_two_state_diff.py) = e64128f48847df15fa742397d0191015
+MD5 (scripts/identical_frame_witness.py) = 41513190b3e2dad3ff0d953f3d4623cc
+MD5 (scripts/launch_smoke.py) = 3ddedda4ebc66f0b10a5f8d740d89726
+MD5 (scripts/ledger_absence_claims.py) = eea2f83547164a93d790cfc9a0491f49
+MD5 (scripts/ledger_readings.py) = 8efd455b8fcf7fe0cb5808a69dc04297
+MD5 (scripts/ledger_round_headings.py) = 5bff763d8d0f3230e2350e64b417d56c
+MD5 (scripts/ledger_timing_scan.py) = b2c78f8d338345d0b14a4e8c34f0eb78
+MD5 (scripts/motion_floor_gate.py) = 18e87c666dc3517c8d1fa7cfc89ffd21
+MD5 (scripts/motion_red_occurrence.py) = ffa6e48ec77a697c912575f44cf77862
+MD5 (scripts/motion_surface_gate.py) = c505c66ecc0648f3430b7e2108f088c2
+MD5 (scripts/mutation_verdict_scan.py) = 682e3cedd840bdcb2391e88ba5aa7641
+MD5 (scripts/prepare_release.py) = 445ad07d8842a3846a8a01af0a24894d
+MD5 (scripts/probe_coverage_gate.py) = 7a76da9a3c45830d9a9262201ad1d8a0
+MD5 (scripts/proc_path.py) = 5b4948f0eec1a42362ff87577564d5eb
+MD5 (scripts/product_streak.py) = eda07a5a0a87d69f841ced8919aea6df
+MD5 (scripts/readings_roster_source.py) = ec321d006bcf72644654bb2573b68146
+MD5 (scripts/real_screen_control_chroma.py) = beb3879cea15c43a737ba62cd3bc1d4b
+MD5 (scripts/real_screen_filter_pill.py) = e9db27bf8fadf7e8ce307d2439a9521e
+MD5 (scripts/real_screen_fold_transition.py) = 820acc5874bb5e9d9dbc494b80c25dce
+MD5 (scripts/real_screen_recorder_ring.py) = ce5b1c18cfdc0009766079e28c710c14
+MD5 (scripts/real_screen_sidebar_icons.py) = 4d083dc6f3345951e8a86c2f2234d516
+MD5 (scripts/red_name_reconciliation.py) = 106e4177b0193711ba6cf97b241b33ea
+MD5 (scripts/report_sources_cell.py) = c2fa3b51476703b00b03f923e851c522
+MD5 (scripts/stage_gate_claims.py) = c241e632cf1f2a1dac8e248976dfe2ea
+MD5 (scripts/surface_left_axes.py) = f67f9cb069613eea588c3cf63190df9c
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthdead.py) = f8f4eb9cdcad36b4d0fb0c7020c3f6db
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthdeclared.py) = caf41c1505751f9c3015e23f84c52701
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthlive.py) = c7d9a735c1dc4d80060e02b3fd8c1f73
+MD5 (scripts/tests/fixtures/hidden_arms_synth/mutate_r_synthopaque.py) = b2c3f52b51e80f390bb8ee518d838ccd
+MD5 (scripts/tests/test_changelog_shape.py) = 4dd0b63a4a2fb44415c5b09f1a0095ae
+MD5 (scripts/tests/test_ci_capture_gate.py) = a0acad559e19145ddd5b283ff5004053
+MD5 (scripts/tests/test_ci_channel_hygiene.py) = 88ec5dfe59ad68865a68bd044a495a95
+MD5 (scripts/tests/test_ci_hover_wiring.py) = 339140d1f9cd4aa84d3b39c9ecf8c483
+MD5 (scripts/tests/test_ci_motion_print_wiring.py) = d4bc3541d781b72bb17e53003be61224
+MD5 (scripts/tests/test_ci_read_queue.py) = ef4534e09eaf6a4c6db4266b18ab5a38
+MD5 (scripts/tests/test_ci_read_reds.py) = 6148ce66b3ca452147922ba9f3947f92
+MD5 (scripts/tests/test_ci_red_stability.py) = 3815d3f66f559c80ca553e9748adba73
+MD5 (scripts/tests/test_ci_report_selftest.py) = e6bed78313cd21115f167491855cdbdc
+MD5 (scripts/tests/test_ci_shape_guard_wiring.py) = d0b401a9c9a7375f1f5432d46f13c1d8
+MD5 (scripts/tests/test_ci_workflow_shape.py) = 703dd197a7b94f3b6f4deee639769467
+MD5 (scripts/tests/test_commit_round_identity.py) = d28e0757391a50d83391ed07cb7b95ce
+MD5 (scripts/tests/test_commit_subject_hygiene.py) = 9a27af5f8a5c28c3914383861084b9f1
+MD5 (scripts/tests/test_create_issues.py) = 85f56b390f3a34e9d52c568b8fc9cc7e
+MD5 (scripts/tests/test_curve_gaps.py) = b232517c42bcf250fd616c11f898ee1b
+MD5 (scripts/tests/test_final_report_claims.py) = f24491699ebb8357a970c225b5892949
+MD5 (scripts/tests/test_final_report_headline.py) = d117425870198faec37f13bf85404e97
+MD5 (scripts/tests/test_final_report_section1_cell.py) = 27ea13c404d44d5d88aa638140718b50
+MD5 (scripts/tests/test_frame_audit.py) = b4681cf63ddbfd9f297145b9596dbf12
+MD5 (scripts/tests/test_frame_audit_bands.py) = bf21df3aa2a652c17e44d63da0f6e23a
+MD5 (scripts/tests/test_frame_baseline.py) = b803414af052632f1d4393b4f7fc2855
+MD5 (scripts/tests/test_frame_recording_proof.py) = 9eb7f16dfc157f94e423777fb2045831
+MD5 (scripts/tests/test_frames_path_hygiene.py) = a57a2c1876c8438e8f53f75c9dc2246d
+MD5 (scripts/tests/test_gate_marker_hygiene.py) = 031b51c232a38fe04ebf531bea96f643
+MD5 (scripts/tests/test_heatmap_frame_levels.py) = 97333fa4b5537ed5c732c93c41e16842
+MD5 (scripts/tests/test_hidden_arms.py) = 42444dbb9c6aa86e89302cb64074b4d7
+MD5 (scripts/tests/test_hover_capture_channel.py) = bfa87bb5f44bbef936a8519364990b40
+MD5 (scripts/tests/test_hover_two_state_diff.py) = 8b0c385b907933cc96d85e765e0e4d9f
+MD5 (scripts/tests/test_identical_frame_witness.py) = c744c279b5c054a1c40eebccc0a1d1c2
+MD5 (scripts/tests/test_install_local.py) = e72f4f689169b2f543b3503bacc2ad9f
+MD5 (scripts/tests/test_knife_guard.py) = 9a6ccd2a71604604889cbc0e99ba48a3
+MD5 (scripts/tests/test_launch_smoke.py) = d39f2d717e7d3536f6c7973d5e52e2f5
+MD5 (scripts/tests/test_ledger_absence_claims.py) = b0f4bf86c2711e218c645949c62a9a75
+MD5 (scripts/tests/test_ledger_citations.py) = 79f34770f36be0f7893dac5b48ec3d24
+MD5 (scripts/tests/test_ledger_generator_output.py) = 52731724ebc0e9e0ef758b63e761f3c2
+MD5 (scripts/tests/test_ledger_ids.py) = 47afcd61e1004b851fa79d6e28d24aea
+MD5 (scripts/tests/test_ledger_placeholders.py) = 9a1941897a04f08a0816d2e08ba966bc
+MD5 (scripts/tests/test_ledger_readings.py) = ca1ac8f2f6d1e1a311d00039e25a86f8
+MD5 (scripts/tests/test_ledger_round_headings.py) = f0dc0aca4db200f9ddd40bb15de5b05f
+MD5 (scripts/tests/test_ledger_rows_keys.py) = f529cbf39688bff0579b959a666057ac
+MD5 (scripts/tests/test_ledger_timing_scan.py) = cb386b657461c68a62b9040a05ce8395
+MD5 (scripts/tests/test_ledger_tokens.py) = 2b14a884a6aec7cdbc34019088b6f4b8
+MD5 (scripts/tests/test_make_info_plist.py) = 98bc29127994bee2acbdde820347e370
+MD5 (scripts/tests/test_motion_floor_gate.py) = d2d9a0e4be0e0c9f3b7e3517ad852714
+MD5 (scripts/tests/test_motion_red_occurrence.py) = 82481f4ba078ce46f74204d01a24ea05
+MD5 (scripts/tests/test_motion_surface_gate.py) = 6595bb9951fe457241bd5ff5762615ad
+MD5 (scripts/tests/test_motion_surface_gate_list_open.py) = 41d8ba51f92cf06557dbaec4ab09c459
+MD5 (scripts/tests/test_motion_surface_gate_retirement.py) = 9e79cb0d1824a88b8e4ab3b50798c046
+MD5 (scripts/tests/test_mutate_arm_registry.py) = 87b3705ca7e09f77bff8b1c7750e48dd
+MD5 (scripts/tests/test_mutate_r271_needle.py) = 540764f816ffe1ab59ab1e25de179bae
+MD5 (scripts/tests/test_mutation_readback.py) = 731f09afd71e201561796167f6c2b306
+MD5 (scripts/tests/test_mutation_readout.py) = a298c2b19b8475e6ded7e1d371521267
+MD5 (scripts/tests/test_mutation_summary_regex.py) = f1137ce31954131aa04975cf7c48084d
+MD5 (scripts/tests/test_mutation_verdict_scan.py) = b569a836cee72efc9338f7776fec4e2b
+MD5 (scripts/tests/test_prepare_release.py) = 9f66fa68b4166585b9f062e526a2a789
+MD5 (scripts/tests/test_probe_coverage_gate.py) = 1bbe28bbda10ff72dec697f4911a5878
+MD5 (scripts/tests/test_product_streak_cell.py) = 50a0a0246b0dd470a97742c8895fcbce
+MD5 (scripts/tests/test_readings_channel_coverage.py) = 11a22e6715a92b1128429118ab8b7912
+MD5 (scripts/tests/test_real_screen_chroma_verdict.py) = e0861479ac434a456fe9ba92316fa2ff
+MD5 (scripts/tests/test_real_screen_filter_pill.py) = 55df954bf83a7b40833ef386e635c7f1
+MD5 (scripts/tests/test_real_screen_identity.py) = 087ff74cf652eccf896d3038a59f28b3
+MD5 (scripts/tests/test_real_screen_probe.py) = 37f501158251953e359a3e99ad98b00a
+MD5 (scripts/tests/test_real_screen_ring_verdict.py) = e304cc45b040ebfe7194280468bc3962
+MD5 (scripts/tests/test_red_name_reconciliation.py) = 7239220678d01b3ca0c38395c73b11ce
+MD5 (scripts/tests/test_round_batch_consistency.py) = 36d7f713731511c3131169e701c90101
+MD5 (scripts/tests/test_round_batch_declaration.py) = fe355c984264002ba089894d4e11cc9e
+MD5 (scripts/tests/test_round_claim_consistency.py) = 58a51da386da53cf98109200560264d3
+MD5 (scripts/tests/test_round_verify_frame_gate.py) = 9be57107ebb195c86c9446924d7e80dc
+MD5 (scripts/tests/test_script_help_runs.py) = b2ac56006c0565cb8823657ae53bea16
+MD5 (scripts/tests/test_sign_bundle.py) = 2b8089fcaaf65c41bf37154ab5721c29
+MD5 (scripts/tests/test_skip_roster.py) = c6bab9ef994527d946f6ffb62fe5dbbc
+MD5 (scripts/tests/test_sources_cell_second_source.py) = fc982f1ae2c2ec753947365e1f279010
+MD5 (scripts/tests/test_stage_gate_claims.py) = a165e3132ef76e73b4a4f971de9c7c54
+MD5 (scripts/tests/test_surface_left_axes.py) = 60f3ce4496b633507a914afafa08ecbc
+MD5 (scripts/tests/test_tier_reporting_shape.py) = 70d54b2807777330240cd3914c5ad24d
+MD5 (scripts/tests/test_tier_vocabulary.py) = 5427b154788cda7f63edef077c7f87e2
+MD5 (scripts/tests/test_ui_probe_report.py) = 82b34abf2f251281e993dae1fd607d5d
+MD5 (scripts/tests/test_ui_round_interval_parity.py) = e44c090c930c776993d9b61e792bf8b2
+MD5 (scripts/tests/test_wait_scan.py) = 1cd910848dc92226732450169f2ee332
+MD5 (scripts/tests/test_zero_floor_guard.py) = 340df719753ba6ebb296ccb8e81a9874
+MD5 (scripts/tier_reporting_shape.py) = 3b0888fd27aad312760b110c7ab46820
+MD5 (scripts/tier_vocabulary.py) = 0ed85312da0d34a7dc85ac67431cb3a5
+MD5 (scripts/ui_probe_report.py) = e81b08e7f283fdcfe83c0d209a614770
+MD5 (scripts/wait_scan.py) = 5bcd51998dc4d4414670daf20041e4e7
+3a1c59a110f53d9ace0a9c36f5029e70 同一份=yes`、`git status scripts/` 与残留串现读（三种变异串各 0 处）→
+   捕获卷 `CAPTURE_LINES=2775`、帧 `FRAMES=356` → 本机那一门 `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）` / 判定 `FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=16 新帧=0 本机行=16 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 已登记=16 未登记=0 陈旧行=0` / 倍率出口 `FRAME_BASELINE_SCALE_BASELINE_UNKNOWN=no-baseline-scale 基线出处=无 基线原因=（无） 当轮=2.00x（当轮量到 356 张 分布=2.00x:356）⇒ **对照缺边**：当轮这一边说得出、基线那一份说不出倍率 ⇒ 这一格既不是「倍率相符」也不是「倍率不合」，它是「没有可比的那一边」；只报数不拦路（放宽/收紧都不发生）` →
+   逐张看图（本节⑥）→ 全量 `FULL_TOTAL=Executed 1441 tests, with 60 tests skipped and 0 failures (663.374s) · Test Suite 'All tests' passed`、skipped `FULL_SKIPPED=60（现读口径，未与上一轮对比 ⇒ 只记数不判成因）` → 三道预检串行 → 换装 `SKIP_INSTALL=no-product-change` →
+   七本台账 → 派生格**落盘之后**现读 → 电池（第一趟/第二趟两个时刻都记）。
+
+⑤ **看图那一腿（尺走 659 认过的形状：`convert("L")` 之后再 `getbbox`，并配同尺寸正对照）**：
+LOOK_SCOPE 本轮帧=356 上一轮帧=356 名字集合相同=True
+LOOK_BYTE_IDENTICAL 逐字节同一=356 不同=0 上一轮没有这张=0
+LOOK_POSITIVE_CONTROL 包围盒=(360, 70, 420, 110) 差量像素=2400 同尺寸=True ⇒ 尺看得见差量
+LOOK_SELF_ZERO 自己vs自己 包围盒=None 差量像素=0 ⇒ 尺没有假红
+LOOK_GATE_CHANGED 门报变帧=16（本轮与 R589 之间没有一张变帧重复出现在差集里=True）
+LOOK_BASELINE_DIR 目录=/Users/wangziyi/Codex_Project0/docs/frame_baselines 条目=1 取最新一份=v1.4.8.json
+  变帧 detail-0-text-720x520-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-0-text-720x520-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-html-rendered-720x520-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-html-rendered-720x520-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-html-source-720x520-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-html-source-720x520-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-text-highlight-720x520-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 detail-text-highlight-720x520-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-hover-420x300-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-hover-420x300-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-list-420x300-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-list-420x300-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-search-focus-420x300-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-search-focus-420x300-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-search-hover-420x300-dark.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+  变帧 quickpick-search-hover-420x300-light.png 基线那一份不在（v1.4.8.json）⇒ 只能报本轮，不硬判
+LOOK_WHOLE_FRAMES_TO_OPEN cardprobe-groupbox-default-720x140-dark.png cardprobe-groupbox-default-720x140-light.png
+
+⑥ **基线与名单**：产品文件 0 个，连续零改动 **22** 轮（唯一取数口 `python3 scripts/product_streak.py`，**台账落盘之后**现读 `PRODUCT_STREAK ledger_round=589 streak=22 sections=565 as_of=last=8f679f9 last_round=567 newest=8f679f9 newest_round=567 date=2026-11-04 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)`；as-of 口径 ⇒ 读作「本轮之前最后一次产品改动在 22 轮前」；取数时刻由 `post_land()` 钉在函数名字上，不在纪律上）。帧名单未动（`FRAMES=356`），
+   四张按机器登记的表一字未改；`frame_baseline.py update` 本轮**一次都没跑**（重烤归用户）。
+
+⑦ **红名与对账**（门报 `RED_NAME_RECONCILIATION 节=R589 红名=12 计入行=9 编号去重=7 不计入=3 未标=0 对不上=0 口径=已启用`，不由我数）：
+- **红名对账**（每条单行，逐字进门）：
+  · 红名「`Ran 893 tests … FAILED (failures=5)`（电池与三条守卫 CLI 并行那一趟）」→ ⑨·1 —— 串行复跑同一卷读 896/OK(5)
+  · 红名「`名册说这一台会跳而实际没跳` 四格（把 `/tmp/r590/frames` 交给电池那一趟）」→ ⑨·4，新开 662
+  · 红名「runner 四条红 `test_the_same_machine_with_an_unmatched_corpus_must_go_red`／`test_working_corpus_either_judges_or_names_why_it_did_not`／`test_rows_from_another_machine_are_not_judged_here`／`test_the_roster_matches_what_this_machine_actually_skips`（取值时刻=读 42159254212 与 42159607721 两趟，逐字相同）」→ ⑨·9
+  · 红名「runner 通道值槽 `U+FFFDU+FFFD`（`SHAPE_GUARD_EXIT` / `IDENTICAL_WITNESS_EXIT` 两条）」→ ⑨·3
+  · 红名「`M1572 post=PASSED`（第一版值槽尺只认 `NAME=value（`）」→ ⑨·3
+  · 红名「刀链与捕获并行 ⇒ `IDENTICAL_PAIR_REFUSED=no-png` 与 `名册帧缺失=1` 两次假红（R589 尾）」→ ⑨·5
+  · 红名「`ci_status_r590.py` 第一版把 0 字节日志判成四条预测全部不中，且 `到数=是` 判据写错」→ ⑨·6
+- **本轮新印出来的名字**：`WITNESS_SCAN_SCOPE`、`WITNESS_SWIFT_NOT_RUN`、`WITNESS_SWIFT_PARTIAL`、
+  `LOOK_SCOPE`、`LOOK_BYTE_IDENTICAL`、`LOOK_POSITIVE_CONTROL`、`LOOK_SELF_ZERO`、`LOOK_GATE_CHANGED`、`CI_STEP_NOT_RUN`、
+  `CI_LOG_EMPTY`（后两条是 `ci_status_r590.py` 的读数串，不进 CI 正文）；
+  既有那 9 个（`SHAPE_GUARD_EXIT` 等）本轮只改值槽形状、名字一字未动。
+- **不计入对账口径**（通道未跑）：`FRAME_BASELINE_SCALE_BASELINE_UNKNOWN` 的 runner 读数（`STEP[11]` 被 skipped）；
+  这一维今天仍只有本机读数 ⇒ 归 R591 的 ⓪·④。
+
+⑧ **闸门与阻塞（§3 第③段今天不开工）**：
+   `STAGE2_CLICKTHROUGH_BLOCKED` 与 `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS=awaiting-654-direction` 一字未撤；
+   `PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED`、`FRAME_BASELINE_DRIFT_NOT_JUDGED` 也在册。
+   现读第③段证人：`STAGE_GATE_CLAIMS 判的范围=STATE R589 + ITER 最新一节 三问全过证人=无 仍挂着的阻塞=2（STAGE2_CLICKTHROUGH_BLOCKED,STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS）
+STAGE_GATE_COUNT 断言=0 冒充段号=0 提及或反向=1
+STAGE_GATE_RESULT=ok 无证断言=0（本轮没有段号形状的断言，或有断言而两个证人齐）` ⇒ 「三问全过」在规格里出现次数仍是 0，两条具名阻塞仍在 ⇒ 着色器那一格继续不写。
+   本轮**没有任何一条**「判=不判 / not-run / 空 else / 扫描面 0」被我说成"没问题"：
+   `有兜底却不出声=0` 带口径（只判兄弟同前缀的链）、`唯一证人=0` 带扫描面与 PARTIAL 下界、
+   `本机行=0` 的 runner 那一支写成"这一维在 runner 上今天没人判"。
+
+⑨ **自伤（照实，不缩）**：
+   1. 判据卷与三条守卫 CLI 并行 ⇒ 同一卷两次读数不一致（并行 893/5 红 vs 串行 896/OK(5)）。
+      规矩本轮被自己踩了一遍：**链条跑的时候不要往同一条 CPU 上塞别的重活**；作废并行那趟，只记串行那趟。
+   2. M1570 的"证人"里有一格没有牙（合成块注释样本在两种剥注释顺序下都红）⇒ 真牙是判真树那一格。
+      写账时按牙记账，不按"我加了几格"记账。
+   3. 值槽尺第一版只认一种形状 ⇒ M1572 PASSED（空刀）。这一把抓到的不是产品，是**我的尺的扫描面** ——
+      与本轮靶 1 同族：`0` 分不清"没有"与"看不见"。修宽重落，刀号不重复占位。
+   4. 把 `/tmp/r590/frames` 交给电池 ⇒ 4 格从 skip 变不跳 ⇒ `SKIP_ROSTER` 的档位里没有"帧目录有没有内容"这一维。
+      我没有改名册（名册与豁免表一字不动是派单红线），改成：本轮电池的正式读数以**不设帧目录**那一趟为准，
+      并把这一格开成 662 交回。
+   5. R589 尾段：刀链与捕获并行两次踩到"目录已建但内容不全"（`no-png` 与 `名册帧缺失=1`）⇒ 本轮刀表的 ENV 显式
+      弹出 `CLIPBOARD_HISTORY_UI_SHOTS`，真语料那一格改成分支判而不是假定环境。
+   6. `ci_status_r590.py` 三处自伤当场被自己的活门抓到：`hits = collections_all = 0, []`（元组赋给两个名字）、
+      判法收到的是**前缀名**而不是正文行（把"我筛过"当成"它说了"，正是 R588 ⑤·(a) 那个洞），
+      以及 `status=in_progress` 却因"有步骤已有 conclusion"判成到数、并把 0 字节日志的四条预测判成"不中"
+      （把缺证据冒充成反证）。三处都在本笔里修掉，并各留注释指向取数时刻。
+   7. heredoc 里中文与 ASCII 引号混排 ⇒ 一次 `SyntaxError`（本轮第三次同族），改法是把补丁脚本落成文件再执行
+      （就是 `build_r590_writer.py` 这份文件存在的原因）。
+   8. `_run(shots, roster)` 第一版按带引号的 `--shots "…"` 去替 ⇒ 活门当场 `assert` 拒绝（正文里那串不带引号）。
+      这条算证人生效，不算修好：写进账是为了说明"活门拦下的一次不等于没有下一次"。
+   9. **本轮 ⓪ 那三条 runner 红是我上一轮（R589）自己写的三格**：本机电池全绿、CI 那一跑逐字相同地打回四条
+      （其中一条是 634 设计的借红）。共同成因不是"CI 环境奇怪"，而是我在写那三格时把**本机的状态**
+      （有帧、名册里有自己的行、`machine_key()` 不等于 `github-runner`）当成了普遍状态。
+      修法写进 D-590 第 3/4 条；两跑（主笔 + 补记笔）红名逐字相同 ⇒ 这不是偶发，也不是 runner 坏了。
+
+⑩ **仍归用户（一条不代选，逐条照抄派单）**：655 / 656 / 657 / 658 / 659 / 660 / 661 / 638① / 654 / 646 / 647 / 650 /
+   651 / 653 / 644 / 639 / 640 / 637 / 633 / Motion ≥2 帧地板 / SSH 成因 / 手感签字 —— 全部不结案；
+   4.5 墨地板、150 上限、120ms、Motion ≥2、2x 8.0pt、1x 6.0pt、`FLOOR_LIGHT=1.20`、`FLOOR_DARK=1.10`、容差 1.5、
+   跳变地板 8、`probeInkFraction=3%`、`.contentFade` 0.20、`--allow-missing`、四张按机器登记的表、名册与豁免表、
+   禁碰 14 面 —— 一字未动；本轮没有改这台机器的全局外观；`update` 一次没跑；帧与日志不含用户真实剪贴板原文。
+
 
 ## R589 状态（2026-11-06 · 第 588 轮 / Round 586 · 产品 0 文件 + **取证通道本身读不读得对对象**（本节① 倍率那组互斥分支补穷尽并新增具名出口 `SCALE_BASELINE_UNKNOWN`；本节② 形状守卫从「只扫循环」扩到「互斥分支链必须有兜底」，并现读出第二处同形洞；本节③ 638② 从散文做成会红的门：逐字节副本名册 + 唯一像素证人断言；本节④ 三条预测之所以读不到，是因为守卫的 print 被 `run_main()` 吞在测试里 ⇒ 把尺接在它被打印的那一步上）+ 判据卷 +38 格 + 刀 M1560–M1566 全 CAUGHT + ⓪ R588 两跑都到数）
 
