@@ -133,12 +133,9 @@ ARMS = [
      u'        key.hasPrefix("NSWindow Frame ")\n', SWIFT_FILTER),
     (u"M1596", u"摄掉 applyGeometry 里那段 √2 不变量 ⇒ 恢复的 492 永远留在用户的窗口上，⑤a 那格必须红",
      CONTROLLER, u"swift",
-     u'            if let lifted = MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,\n'
-     u'                                                                width: width,\n'
-     u'                                                                height: frame.height) {\n'
-     u'                frame.size.height = lifted\n'
-     u'                heightLifts += 1\n'
-     u'            }\n',
+     # R593 重钉：这一段本轮被扩成「抬 / 不抬两种原因」两支，旧针整块找不到了（预检 命中=0 报出来的，
+     # 不是我看出来的）。摘掉整支 ⇒ ⑤a 那格与 decline 那格都该红，判定按红话里的字样分开。
+     '            if let lifted = MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,\n                                                                width: width,\n                                                                height: frame.height,\n                                                                visibleHeight: visible?.height) {\n                frame.size.height = lifted\n                heightLifts += 1\n                heightLiftDecline = nil\n            } else if MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,\n                                                          width: width,\n                                                          height: frame.height) != nil {\n                // 不加那条界就会抬 —— 这一格把「是容差说没事」和「是可见帧说放不下」分开，\n                // 否则读数是 `抬=0`，下一轮分不清是哪一种。\n                heightLiftDecline = "visible-too-short"\n                heightLiftDeclines += 1\n            }\n',
      u'', SWIFT_FILTER),
     (u"M1597", u"容差写成负数（于是恒抬）⇒ 用户等比拖出来的 900×637 也被抹回 600"
                u"：⑤a 的第二趟与真值表那格必须红（容差本身要有牙）",

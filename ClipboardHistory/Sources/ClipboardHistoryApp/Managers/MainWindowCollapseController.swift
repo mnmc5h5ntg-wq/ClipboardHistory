@@ -41,6 +41,10 @@ final class MainWindowCollapseController: ObservableObject {
     private(set) var geometryMigration: MainWindowGeometryMigration.Plan?
     /// R592：√2 不变量今天生效了几次（判据数这一格；一次切换之后它必须是 0 或 1，不许逐拍涨）。
     private(set) var heightLifts = 0
+    /// R593 / 靶 3：不变量"想抬但放不下"那一档的次数与原因（`visible-too-short`）。
+    /// 为什么单独记：只印 `抬=0` 分不清"已在比例上"与"屏幕放不下"，而那两种的修法相反。
+    private(set) var heightLiftDeclines = 0
+    private(set) var heightLiftDecline: String?
 
     /// 一步切换 ⇒ 永远没有"在飞"的过渡。保留这一格是因为菜单项与真机通道要问"现在能不能再点"。
     var isTransitioning: Bool { false }
@@ -122,6 +126,8 @@ final class MainWindowCollapseController: ObservableObject {
         publishedIntermediates = 0
         publishedProgressValues.removeAll()
         heightLifts = 0
+        heightLiftDeclines = 0
+        heightLiftDecline = nil
     }
 
     private func rememberWidth(of window: NSWindow) {
@@ -159,11 +165,22 @@ final class MainWindowCollapseController: ObservableObject {
             // R592：√2 那条锁的补漏 —— 高度不在锁允许的比例上 ⇒ 只能是锁出现之前恢复下来的旧尺寸。
             // 顺序要紧：先改高度，下面那句 `originY(clampingTop:height:)` 才会按新高度回算 origin，
             // 顶边（用户放的位置）因此逐字不动。
+            // R593 / 靶 3：抬的目标还要**放得下**（`visibleHeight`）—— 全屏那一档量到 1470×923，
+            // 按 √2 抬是 1039.4 而可见帧高只有 850 ⇒ 那一抬会把窗口抬得比屏幕还高，所以不抬并记下原因。
             if let lifted = MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,
                                                                 width: width,
-                                                                height: frame.height) {
+                                                                height: frame.height,
+                                                                visibleHeight: visible?.height) {
                 frame.size.height = lifted
                 heightLifts += 1
+                heightLiftDecline = nil
+            } else if MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,
+                                                          width: width,
+                                                          height: frame.height) != nil {
+                // 不加那条界就会抬 —— 这一格把「是容差说没事」和「是可见帧说放不下」分开，
+                // 否则读数是 `抬=0`，下一轮分不清是哪一种。
+                heightLiftDecline = "visible-too-short"
+                heightLiftDeclines += 1
             }
         }
         if let visible {

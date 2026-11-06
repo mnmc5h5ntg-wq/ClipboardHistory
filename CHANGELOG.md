@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### √2 不变量补上「放得下」那一半；帧通道对默认几何的盲做成会红的守卫（R593 / 第 592 轮 / Round 590）
+
+- 产品：`MainWindowCollapsePolicy.heightLift` 多收 `visibleHeight`，目标高度放不下可见帧就**不抬**；
+  控制器把 `visible?.height` 喂进去，并把"为什么不抬"记成 `heightLiftDeclines` + `heightLiftDecline="visible-too-short"`。
+  证人：`FOLD_LIFT_DECLINE 内容=1470.0x923.0 抬次数=0 不抬次数=1 原因=visible-too-short 可见帧高=850.0`。
+- 产品（通路逐条量）：放大档 `1201×850` 距 √2 0.13% ⇒ 不变量不出声（写成断言）；
+  全屏档会出声，但退出那一档本机走不完 ⇒ `FOLD_FULLSCREEN_MEASURE_NOT_RUN=exit-not-settled`。
+- 判据：`FoldGeometryMigrationTests` 13 格（新增 zoom/全屏/decline 三格 + 真值表补 `visibleHeight` 三行 + 900×640 那一行）；
+  新守卫四支 `frame_geometry_blind` / `ledger_preflight` / `reading_order_scan` / `bundle_content_gate`，
+  判据卷 +18 格；CI 新硬步骤 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)`。
+- 修：runner 上红的那朵 `testARestoredOffRatioWindowIsLiftedOntoTheSpecRatio` 是**夹具前提写死在本机屏幕** ⇒
+  起点改由 visibleFrame 反推，"放不下"那一档单独判"被夹到可见帧顶部"；
+  `SKIP_ROSTER` 读数行从门后挪到门前（内层一红时 runner 上那一行原本连印都印不出来）。
+- 更正旧读法：「帧逐字节相同 ⇒ 本轮没动产品」今天只能证"捕获那两棵树未变"——
+  捕获侧对 `MainWindowCollapsePolicy` 的引用是 **0**（`FRAME_GEOMETRY_DEFAULTS` 现读）。旧原文不删。
+- 单子：新开 **666**（帧通道要不要真看得见默认几何，三条出路归用户）、
+  **667**（12 那一档 + 外接屏 + D5 那条让位要不要接受）；622 那朵 probe 红只否掉一条解释、另一条留给含本笔的那一跑。
+- 刀：**M1598–M1610 十三把全 CAUGHT**（落刀前现读高水位 M1597）；
+  `PROBE-12` 探针 PASSED ⇒ 空刀不占号；`update` 一次没跑；没动用户的 Dock 与登录项。
 
 ### 升级用户看不到的那半段第①段：一次性迁移 + √2 不变量；构建产物从仓库根搬进暂存目录（R592 / 第 591 轮 / Round 589 · 2026-11-06）
 

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "registered_by_round": 593,
+  "policy_defaults": {
+    "expandedWidthDefault": 848.0,
+    "collapsedWidthDefault": 424.0,
+    "contentHeightDefault": 600.0
+  },
+  "harness_policy_refs": 0,
+  "capture_files_scanned": 4,
+  "frame_count": 356,
+  "blind_to": "policy-default",
+  "second_channel_today": [
+    "真机 AX 读数（R592 换装之后现读 848×600、分栏 423.5/424.5）—— 它不是像素帧，不许当帧覆盖",
+    "FoldGeometryMigrationTests 的产品入口判据（controller.applyGeometry + 真窗口 + 恢复帧串手术）",
+    "heightLift 真值表（含 R593 新加的 visibleHeight 那一档）"
+  ],
+  "note": "这一维的证人今天来自上面三条，不来自那 356 张帧。帧通道对『产品默认几何』是结构性盲：UICaptureHarness 里 MainWindowCollapsePolicy 出现 0 次，夹具按自己钉死的尺寸建窗（750×560 / 420×300 / 300×74 等），所以默认从 750/420 抬到 848/424 那一次，帧逐字节相同是必然结果、不是『产品没动』的反证。撤掉这条具名的唯一合法方式是让捕获真的引用产品默认几何（refs>0），那时守卫会反过来红『登记还说着盲』。",
+  "user_decision_left_open": "要不要给帧通道加一档按产品默认建的夹具（那会改捕获尺寸 ⇒ 整批基线重烤 ⇒ 归用户，见 BACKLOG 666）"
+}

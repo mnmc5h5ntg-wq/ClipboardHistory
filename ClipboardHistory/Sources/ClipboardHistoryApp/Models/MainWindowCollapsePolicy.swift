@@ -83,11 +83,20 @@ enum MainWindowCollapsePolicy {
     /// 只能来自锁出现之前那一次恢复（用户机上现读 848×492，比 1.72）。
     /// 折叠态同理但方向相反：424 宽对应的规格高仍是 600（D5「折叠 = 高度不变、宽度对折」）。
     /// macOS 12 没有那条锁 ⇒ 调用方必须**不**用这一支（12 上拖得出任意比例，抬它就是抹用户的调整）。
+    ///
+    /// R593 / 靶 3 加的那一条 `visibleHeight`：不变量只能把高度抬到**放得下**的那一档。
+    /// 本机实测有一条合法通路会把宽高一起推到很大 —— 全屏那一档 `1470×923`（`FOLD_FULLSCREEN_PATH`），
+    /// 按 √2 抬就是 `1039.4`，而可见帧高只有 `850.0` ⇒ 窗口比屏幕还高，底部够不着。
+    /// 宽度那一侧本来就有同一条界（`targetWidth` 取 `min(floor, visibleWidth)`），高度缺了这一格
+    /// 是**不对称**，不是假想：放不下 ⇒ 不抬，让调用方把这一档具名印出来。
     static func heightLift(collapsed: Bool, width: CGFloat, height: CGFloat,
+                           visibleHeight: CGFloat? = nil,
                            tolerance: CGFloat = 0.02) -> CGFloat? {
         guard width > 0, height > 0 else { return nil }
         let target = collapsed ? width * 2.0.squareRoot() : width / 2.0.squareRoot()
-        return abs(height - target) / target > tolerance ? target : nil
+        guard abs(height - target) / target > tolerance else { return nil }
+        if let visibleHeight, visibleHeight > 0, target > visibleHeight { return nil }
+        return target
     }
 
     /// 收缩/放宽都保持左上角：x 不越过屏幕左右边，top 不越过屏幕上下边。

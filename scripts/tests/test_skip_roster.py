@@ -88,7 +88,10 @@ ROSTER = {
         # 现在填的是读来的名字，不是猜的；两跑同读才签（R83：单次 runner 读数不配签字）。
         'test_built_bundle_carries_no_app_delegate_stub':
             'runner 的暂存目录里没有已构建的 时间剪史.app（R592/620 起落点是 /tmp/<APP>_bundle，'
-            '电池排在 `make bundle` 之前；历史两跑 run 39608106160 与 39607521077 同读的是仓库根那一份）',
+            '电池排在 `make bundle` 之前；历史两跑 run 39608106160 与 39607521077 同读的是仓库根那一份）。'
+            'R593/靶 2 补上"这一维由谁出声"：产物内容那一维改由硬步骤 '
+            '`Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 在产物落地之后判，'
+            '所以这一格的缺席不再等于"没人判"——读数行 `BUNDLE_CONTENT_GATE_RESULT=` 在那一步里',
         # R309 新加的那格「拿真产物日志对账」在 runner 上必然缺席：/tmp/r308_chain.log 是本机
         # 验证链留下的，runner 的 /tmp 里没有它。名字是 **runner 自己点出来的**，不是我猜的：
         # run 39965996188（340452f）STEP[9] 打
@@ -251,6 +254,25 @@ class SkipRosterTests(unittest.TestCase):
         # ②它替真正的那朵红做伪证，读起来像"探针没跑完"。现在拆成三种读数（`inner_summary_verdict`），
         # 真缺席 ⇒ 具名出口；汇总是 FAILED ⇒ 仍然红，但内层的红名必须原样带出来。
         state, detail = inner_summary_verdict(text)
+        actual = sorted(n for n, v in records.items() if v == 'skipped')
+        # 两道恒等式门要的是**排除之前**的数，先把它们记下来，再动 `actual`（下面那行排除观察者不许删，
+        # 它是 M841 的针：删掉之后观察者会落进"名单外"，红话必须是 `名单外出现 skip`）。
+        parsed_all = len(actual)
+        observer_count = actual.count(OBSERVER_ID)
+        actual = [n for n in actual if n != OBSERVER_ID]
+        expected = set(ROSTER[klass])
+        extra = [n for n in actual if n not in expected]
+        gone = sorted(expected - set(actual))
+        # 读数行坐在**所有会崩的门之前**（R589 那一族的又一实例）。第一版把它印在 `inner-red` 那一支的
+        # `fail` 之后 ⇒ 内层一红，这一格在 runner 上连一行都不印（本轮 `42210166309` 实测
+        # `SKIP_ROSTER 键=github-runner` 出现 **0 次**），于是"这一维今天有没有人判"只剩猜。
+        # 现在三种结论都先把行印出来，再谈红。
+        # 字段名不许叫 `skipped=`（R292 / 341）：台账生成器普遍用未锚定的 `skipped=(\d+)` 取电池自己的
+        # 结论行，而这一行印在它前面 ⇒ 借到的是**内层那一卷**的数。歧义要在源头消掉。
+        print('SKIP_ROSTER 键=%s 类=%s 内层Ran=%s 内层判=%s 内层skip汇总=%s 解析=%d 名单外=%s 名册未跳=%s'
+              % (key, klass, (ran[-1] if ran else u'无'), state,
+                 (detail if state == 'ok' else u'（内层不是 OK ⇒ 这一格今天没有可对账的数）'),
+                 len(actual), extra or u'无', gone or u'无'), flush=True)
         if state == 'no-summary':
             self.skipTest('SKIP_ROSTER_INNER_NO_SUMMARY=1 内层连汇总行都没有（键=%s 类=%s）'
                           '⇒ 无从对账。这是**缺席**，要具名，不许读成"没缺席"，更不许读成"通过"。'
@@ -264,25 +286,15 @@ class SkipRosterTests(unittest.TestCase):
                       '汇总行「%s」；内层红名=%s（键=%s 类=%s）。'
                       '这一句从前写成「内层没有结论行」，那是把被观察者的红借成观察者的缺席（634）。'
                       % (excerpt, detail, key, klass))
-        actual = sorted(n for n, v in records.items() if v == 'skipped')
-        # 恒等式闸门：解析到的 id 数必须等于内层汇总的 skipped 数（观察者那一格在嵌套里也 skip，算在里面）
-        self.assertEqual(int(skipped.group(1)), len(actual),
+        # 恒等式闸门：解析到的 id 数必须等于内层汇总的 skip 数（观察者那一格在嵌套里也 skip，算在里面）
+        self.assertEqual(int(detail), parsed_all,
                          '解析到 %d 格 skip，内层汇总说 %s 格 ⇒ 归属漏了（R277 那一版的红法正是少认一格）'
-                         % (len(actual), skipped.group(1)))
+                         % (parsed_all, detail))
         # 观察者自己在嵌套那一跑里必然 skip（防递归）—— 它不许混进"名单外"，也不许被沉默减掉：
         # 排除动作本身写成会红的判据（R277 那条：排除观察者恰好 1 格，多一格少一格都红）。
-        self.assertEqual(1, actual.count(OBSERVER_ID),
+        self.assertEqual(1, observer_count,
                          '嵌套那一跑里观察者那一格应当恰好 skip 一次，实得 %d 次 ⇒ 防递归失效或归属重了'
-                         % actual.count(OBSERVER_ID))
-        actual = [n for n in actual if n != OBSERVER_ID]
-        expected = set(ROSTER[klass])
-        extra = [n for n in actual if n not in expected]
-        gone = sorted(expected - set(actual))
-        # 字段名不许叫 `skipped=`（R292 / 341）：台账生成器普遍用未锚定的 re.search(r"skipped=(\d+)")
-        # 取电池自己的结论行，而这一行印在它前面 ⇒ 借到的是**内层那一卷**的数（合法地多一颗观察者自己的
-        # 防递归 skip）。歧义要在源头消掉：读数行的键名与 unittest 的结论行键名不许重名。
-        print('SKIP_ROSTER 键=%s 类=%s 内层Ran=%s 内层skip汇总=%s 解析=%d 名单外=%s 名册未跳=%s'
-              % (key, klass, ran[-1], skipped.group(1), len(actual), extra or u'无', gone or u'无'), flush=True)
+                         % observer_count)
         self.assertEqual([], extra,
                          '名单外出现 skip（%s）⇒ 有人新增了一格会跳的判据却没登记它替谁承重（331）' % extra)
         self.assertEqual([], gone,

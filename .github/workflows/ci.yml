@@ -610,6 +610,29 @@ jobs:
             exit 1
           fi
 
+      # R593 / 靶 2：产物**内容**那一维在 runner 上有没有读数。
+      # 为什么单独立一步：620 把落点搬进暂存目录之后，端到端那一格（`otool` 读桩）跟着搬，
+      # 而它住在电池里、电池排在 `make bundle` 之前 ⇒ 它在 runner 上**永远** skip。
+      # 那不是豁免，是"这一维没人判"。不许改电池顺序（R558 那一族：swift 卷并行会撞锁假报 NOT_RUN_TIMEOUT），
+      # 所以把这一维挪到产物已经落地之后的这一步，由它出声；电池那一格继续具名 skip，理由指向这一步。
+      - name: Built bundle content gate (D-029 stubs, BACKLOG 620 second half)
+        if: always()
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          status=0
+          python3 scripts/bundle_content_gate.py | tee /tmp/bundle-content.log || status=$?
+          grep -E '^(BUNDLE_TARGET|BUNDLE_CONTENT_GATE_RESULT|BUNDLE_CONTENT)=' /tmp/bundle-content.log \
+            || { echo "BUNDLE_CONTENT_READING_MISSING=1"; echo "  尺一行都没印出来 ⇒ 不许把空日志读成干净"; exit 1; }
+          if [ "$status" -eq 2 ]; then
+            echo "BUNDLE_CONTENT_NOT_RUN=1 这一格的读法：产物不在暂存目录 ⇒ 上面那一步的 make bundle 没落地，这一维没判到（没判到不等于干净）"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "BUNDLE_CONTENT_RED=1 这一格的读法：AppDelegate 桩回来了，或解析器一个桩都没读到（尺瞎了）—— 两种都拦"
+            exit 1
+          fi
+
       # R89 / 结构性的一条：硬门全部挪到**所有产证据的步骤之后**，并各自 `if: always()`。
       # 为什么：R88 把 `On-screen probe coverage floor` 留在原位，它红了之后 GitHub 把后面
       # **九个步骤全 skip 掉**（动效卷、动效地板、脚本自测、Info.plist、两张帧基线、启动冒烟）
